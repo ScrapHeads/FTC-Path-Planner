@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FTC Field Path Picker → Pose2d</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+  <!-- LEFT: Config / Tools (scrolls independently) -->
+  <div class="left">
+    <h1>FTC Field Path Picker</h1>
+    <div class="small">
+      Press <b>N</b> to add a waypoint at the cursor. Click a point to select. Drag point to move
+      (hold <b>Shift</b> to nudge by <b>0.5″</b>). Drag handle or use <b>Q/E</b> to rotate
+      (hold <b>Shift</b> for 15° snap). Output is in <b>radians</b> for Java <code>Pose2d</code>.
+    </div>
+
+    <h2>1) Field Image</h2>
+    <div class="grid-2">
+      <div>
+        <label>Load image (PNG/JPG/SVG/WebP/BMP/GIF)</label>
+        <input id="imgInput" type="file" accept="image/*" />
+        <div class="small">Tip: SVG/WebP work too. Animated GIFs load the first frame.</div>
+      </div>
+      <div>
+        <label>Sample image</label>
+        <select id="sampleSelect">
+          <option value="">— none —</option>
+          <option value="https://preview.redd.it/into-the-deep-meepmeep-custom-field-images-printer-friendly-v0-qsax5fraignd1.png?width=1080&crop=smart&auto=webp&s=4bfa9fc15dc26c12019b35015d009446dcb724b9">Into the Deep field</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div>
+        <label>Field width (inches)</label>
+        <input id="fieldInches" type="number" value="144" />
+      </div>
+      <div>
+        <label>Origin</label>
+        <select id="originSelect">
+          <option value="center">Center (0,0 at field center)</option>
+          <option value="bottomLeft">Bottom-left corner</option>
+          <option value="topLeft">Top-left corner</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <label>
+        <input id="axesFtc" type="checkbox" checked />
+        <span id="axesText">Axes mode: <b>X+ forward</b>, <b>Y+ left</b></span>
+      </label>
+    </div>
+    <div class="small">Coordinates are computed in <b>inches</b>. Toggle switches coordinate axes.</div>
+
+    <h2>2) Waypoints</h2>
+    <div class="toolbar">
+      <button id="undoBtn">Undo</button>
+      <button id="redoBtn">Redo</button>
+      <button id="deleteBtn">Delete selected</button>
+      <button id="clearBtn" class="danger">Clear</button>
+      <button id="loadBtn">Load file…</button>
+    </div>
+
+    <!-- Direct pose editing -->
+    <div class="grid-2" style="margin-top:8px">
+      <div>
+        <label>Selected X</label>
+        <input id="selXIn" type="number" step="0.5" value="0" />
+      </div>
+      <div>
+        <label>Selected Y</label>
+        <input id="selYIn" type="number" step="0.5" value="0" />
+      </div>
+    </div>
+
+    <div class="grid-2" style="margin-top:8px">
+      <div>
+        <label>Selected heading (deg)</label>
+        <input id="headingDeg" type="number" step="1" value="0" />
+      </div>
+      <div>
+        <label>Quick rotate</label>
+        <div class="row">
+          <button data-rot="-15">-15°</button>
+          <button data-rot="-5">-5°</button>
+          <button data-rot="5">+5°</button>
+          <button data-rot="15">+15°</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- NEW: Heading loop toggle -->
+    <div class="row" style="margin-top:8px">
+      <label class="row">
+        <input id="headingWrap" type="checkbox" />
+        <span>Wrap headings to <b>±180°</b> for display and <b>±π</b> on export</span>
+      </label>
+    </div>
+    <div class="small">Off = show 0–360° and export radians in [0, 2π). On = show −180…+180° and export radians in (−π, +π].</div>
+
+    <!-- Robot footprint (rectangle) -->
+    <h2>Robot footprint</h2>
+    <div class="grid-2">
+      <div>
+        <label>Length (in)</label>
+        <input id="robotLenIn" type="number" step="0.5" value="18" />
+      </div>
+      <div>
+        <label>Width (in)</label>
+        <input id="robotWidIn" type="number" step="0.5" value="18" />
+      </div>
+    </div>
+    <div class="row" style="margin-top:6px">
+      <label><input id="boxRotate" type="checkbox" checked /> Align with heading</label>
+    </div>
+
+    <div class="list" style="margin-top:8px">
+      <table>
+        <thead>
+          <tr><th>#</th><th id="thX">X fwd (+)</th><th id="thY">Y left (+)</th><th>θ deg</th><th>Controls</th></tr>
+        </thead>
+        <tbody id="pointRows"></tbody>
+      </table>
+    </div>
+
+    <!-- EXPORT -->
+    <h2>3) Export</h2>
+    <div class="grid-2">
+      <div>
+        <label>Java class</label>
+        <select id="javaType">
+          <option value="rr">com.acmerobotics.roadrunner.geometry.Pose2d</option>
+          <option value="ftclib">com.arcrobotics.ftclib.geometry.Pose2d</option>
+        </select>
+      </div>
+      <div>
+        <label>Format</label>
+        <select id="exportKind">
+          <option value="list">List&lt;Pose2d&gt;</option>
+          <option value="array">Pose2d[]</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="grid-2" style="margin-top:8px">
+      <div>
+        <label>File type</label>
+        <select id="exportFileType">
+          <option value="java-class">Java class (.java)</option>
+          <option value="java-snippet">Java snippet only (.java.txt)</option>
+          <option value="json">JSON (.json)</option>
+          <option value="csv">CSV (.csv)</option>
+        </select>
+      </div>
+      <div>
+        <label>Class name (for Java class)</label>
+        <input id="className" type="text" value="AutoPath" />
+      </div>
+    </div>
+
+    <div>
+      <label>Package (for Java class)</label>
+      <input id="packageName" type="text" value="org.firstinspires.ftc.teamcode.auto.paths" />
+    </div>
+
+    <div class="toolbar" style="margin-top:8px">
+      <button id="exportBtn" class="accent">Preview</button>
+      <button id="saveFileBtn">Save to file…</button>
+      <button id="chooseDirBtn">Choose folder…</button>
+      <button id="copyBtn">Copy to clipboard</button>
+    </div>
+
+    <label style="margin-top:10px">Output</label>
+    <code id="output"></code>
+    <div class="small" style="margin-top:6px">
+      Tip: use “Choose folder…” and select your repo directory, e.g.
+      <code>TeamCode/src/main/java/org/firstinspires/ftc/teamcode/auto/paths</code>,
+      then “Save to file…” writes directly there (Chrome/Edge).
+    </div>
+  </div>
+
+  <!-- RIGHT: Canvas (stays fixed; no scroll) -->
+  <div class="right">
+    <div class="row">
+      <span class="pill">N: add point @ cursor</span>
+      <span class="pill">Click point: select</span>
+      <span class="pill">Drag point: move (Shift=0.5″)</span>
+      <span class="pill">Drag handle / Q,E: rotate (Shift=15°)</span>
+    </div>
+    <div class="canvasWrap" id="dropZone" title="Drop an image here">
+      <canvas id="canvas"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Load the modular app -->
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+:root{--bg:#0b0f14;--panel:#121821;--muted:#90a4ae;--text:#e6edf3;--accent:#7dd3fc;--accent2:#a78bfa;--danger:#ef4444}
+
+/* Page never scrolls; left panel will handle its own Y scroll */
+html, body {
+  height: 100%;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.35 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial;
+  overflow: hidden;            /* prevent page scroll */
+}
+
+/* Two columns: fixed config width, canvas fills the rest */
+.app{
+  display: grid;
+  grid-template-columns: 550px 1fr;  /* fixed config width */
+  gap: 14px;
+  height: 100vh;                     /* full viewport height */
+}
+
+.left{
+  background: var(--panel);
+  padding: 14px;
+  box-sizing: border-box;
+  overflow-y: auto;                  /* left column scrolls */
+  overflow-x: hidden;
+}
+
+.right{
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  box-sizing: border-box;
+  height: 100vh;                     /* fixed to viewport */
+  overflow: hidden;                  /* no scroll on canvas column */
+  min-height: 0;
+}
+
+.right .row{
+  flex-shrink: 0;
+}
+
+/* Canvas wrapper fills remaining height and never scrolls */
+.canvasWrap{
+  background:#0b0f14;
+  border:1px solid #223041;
+  border-radius:12px;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;                  /* stop internal scroll */
+}
+
+canvas{
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+code{
+  background:#0f141b;
+  border:1px solid #223041;
+  padding:8px;
+  display:block;
+  border-radius:10px;
+  max-height:240px;
+  overflow:auto;
+
+  white-space: pre;                 /* preserve newlines exactly */
+  font-family: ui-monospace, Menlo, Consolas, "Liberation Mono", monospace; /* optional: monospace */
+}
+
+/* UI bits */
+h1{font-size:18px;margin:0 0 10px 0}
+h2{font-size:14px;color:var(--muted);margin:18px 0 8px 0}
+label{display:block;margin:8px 0 4px 0}
+input,select,button,textarea{background:#0f141b;border:1px solid #243041;color:var(--text);padding:8px;border-radius:10px;font:inherit}
+button{cursor:pointer}
+.row{display:flex;gap:8px;align-items:center}
+.row>*, .grid-2>*{flex:1}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap}
+.pill{background:#0f141b;border:1px solid #223041;border-radius:999px;padding:6px 10px;color:var(--muted);user-select:none}
+.list{max-height:240px;overflow:auto;border:1px solid #223041;border-radius:10px}
+table{width:100%;border-collapse:collapse}
+th,td{padding:8px;border-bottom:1px solid #203040;text-align:left}
+tr:hover{background:#111820}
+code{background:#0f141b;border:1px solid #223041;padding:8px;display:block;border-radius:10px;max-height:240px;overflow:auto}
+.small{font-size:12px;color:var(--muted)}
+.danger{border-color:var(--danger);color:#fecaca}
+.accent{border-color:#235a6d}
+.dragging{outline:2px dashed var(--accent)}
