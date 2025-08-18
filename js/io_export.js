@@ -122,7 +122,7 @@ export function doExport(){
 
 function buildExportArtifacts(poses, cfg){
   const ctorImport = (cfg.lib==='rr'
-    ? 'import com.acmerobotics.roadrunner.Pose2d'
+    ? 'com.acmerobotics.roadrunner.Pose2d'
     : 'com.arcrobotics.ftclib.geometry.Pose2d');
 
   const className = sanitizeJavaIdent(cfg.cls || 'AutoPath');

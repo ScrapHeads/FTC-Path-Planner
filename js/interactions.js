@@ -5,8 +5,8 @@ import {
   pushHistory, undo, redo
 } from './state.js';
 import { draw } from './draw.js';
-import { layout, canvasToImagePx, pxToField, fieldToImagePx } from './layout.js';
-import { maybeSnapAngle, normalize } from './utils.js';
+  import { layout, canvasToImagePx, pxToField, fieldToImagePx } from './layout.js';
+import { normalize } from './utils.js';
 import { updateTable, syncSelectedUI } from './ui.js';
 
 export function initInteractions(){
@@ -39,7 +39,6 @@ export function initInteractions(){
 
     // Measure tool: update with snapping
     if (state.measureActive){
-      // Snap both start and end to grid (1" default, 0.5" when Shift)
       const snapIn = e.shiftKey ? 0.5 : 1.0;
       const startSnapped = snapCanvasToGrid(state.measureStart, snapIn);
       const endSnapped   = snapCanvasToGrid(m, snapIn);
@@ -75,18 +74,25 @@ export function initInteractions(){
       const p = state.points[state.selected];
       const cx = imgRect.x + p.xPx * (imgRect.w / state.img.width);
       const cy = imgRect.y + p.yPx * (imgRect.h / state.img.height);
-      let ang = Math.atan2(m.y - cy, m.x - cx);
-      // Angle snapping: Shift=15°, Alt=5°
+
+      // Canvas angle: 0 along +X (right); increases CLOCKWISE because y is down
+      const angCanvas = Math.atan2(m.y - cy, m.x - cx);
+
+      // Convert to FIELD angle: 0 = North (up), CCW positive
+      // θ_field = -angCanvas - π/2
+      let angField = -angCanvas - Math.PI/2;
+
+      // Snap (Shift=15°, Alt=5°) in FIELD frame
       const snap = e.shiftKey ? (15*Math.PI/180) : (e.altKey ? 5*Math.PI/180 : 0);
-      if (snap) ang = Math.round(ang/snap)*snap;
-      state.points[state.selected].headingRad = maybeSnapAngle(ang, false);
+      if (snap) angField = Math.round(angField/snap)*snap;
+
+      state.points[state.selected].headingRad = normalize(angField);
       els.headingDeg.value = formatDegForUI(state.points[state.selected].headingRad).toFixed(1);
       updateTable(); draw();
     }
   });
 
   window.addEventListener('mouseleave', ()=>{
-    // Hide hover label when leaving canvas
     state.hoverActive = false;
     if (state._hoverTimer) { clearTimeout(state._hoverTimer); state._hoverTimer = null; }
     draw();
@@ -94,12 +100,12 @@ export function initInteractions(){
 
   window.addEventListener('mouseup', ()=>{ state.dragMode=null; });
 
-  // Keyboard: N add, Q/E rotate, Preview P [ ] \ /, Undo/Redo Ctrl+Z/Ctrl+Y, Delete, Ctrl+D duplicate, H HUD, M measure
+  // Keyboard
   window.addEventListener('keydown', e=>{
     const tag = (document.activeElement && document.activeElement.tagName) || '';
     const typing = tag==='INPUT' || tag==='TEXTAREA' || tag==='SELECT';
 
-    // Measure start (M hold) — snap the start immediately to 1" (or 0.5" if Shift is already held)
+    // Measure start (hold M)
     if (!typing && (e.key==='m' || e.key==='M') && !state.measureActive){
       state.measureActive = true;
       const snapIn = e.shiftKey ? 0.5 : 1.0;
@@ -112,7 +118,7 @@ export function initInteractions(){
     if (e.ctrlKey && !typing){
       if (e.key.toLowerCase() === 'z'){ e.preventDefault(); if (undo()){ syncSelectedUI(); updateTable(); draw(); } return; }
       if (e.key.toLowerCase() === 'y'){ e.preventDefault(); if (redo()){ syncSelectedUI(); updateTable(); draw(); } return; }
-      if (e.key.toLowerCase() === 'd'){ // Ctrl+D duplicate
+      if (e.key.toLowerCase() === 'd'){ // duplicate
         e.preventDefault();
         if (state.selected >= 0){
           pushHistory();
@@ -146,13 +152,14 @@ export function initInteractions(){
       }
     }
 
+    // Q/E rotation: Q = CCW (+), E = CW (−)
     if(state.selected>=0 && (e.key.toLowerCase()==='q' || e.key.toLowerCase()==='e') && !typing){
       if (state.points[state.selected].locked) return;
-      const dir = e.key.toLowerCase()==='q' ? -1 : 1;
+      const dir = e.key.toLowerCase()==='q' ? +1 : -1;
       const base = e.shiftKey ? 15 : 5;
       const step = base * Math.PI/180;
       pushHistory();
-      rotateSelected(dir*step);
+      rotateSelected(dir*step); // CCW-positive in field
     }
 
     if(!typing){
@@ -182,7 +189,7 @@ export function initInteractions(){
   window.addEventListener('keyup', e=>{
     if (state.measureActive && (e.key==='m' || e.key==='M')){
       state.measureActive = false;
-      draw(); // hide overlay (keeping last hover label behavior)
+      draw();
     }
   });
 }
@@ -222,11 +229,14 @@ function hitTest(cx, cy){
     const p = state.points[i];
     const px = imgRect.x + p.xPx * (imgRect.w / state.img.width);
     const py = imgRect.y + p.yPx * (imgRect.h / state.img.height);
+
     const dx = cx - px, dy = cy - py;
     const dist = Math.hypot(dx,dy);
     if(dist < 10*(window.devicePixelRatio||1)){
-      const hx = px + Math.cos(p.headingRad) * 28*(window.devicePixelRatio||1);
-      const hy = py + Math.sin(p.headingRad) * 28*(window.devicePixelRatio||1);
+      // Canvas angle corresponding to field heading: angC = -(θ + π/2)
+      const angCanvas = -(p.headingRad + Math.PI/2);
+      const hx = px + Math.cos(angCanvas) * 28*(window.devicePixelRatio||1);
+      const hy = py + Math.sin(angCanvas) * 28*(window.devicePixelRatio||1);
       const hdist = Math.hypot(cx-hx, cy-hy);
       return { type:'point', index:i, handle:(hdist < 10*(window.devicePixelRatio||1)) };
     }
@@ -242,12 +252,10 @@ function mousePos(e){
 
 // ---------- Helpers for snapping & hover ----------
 
-// snap a canvas point to a grid in FIELD inches, then return snapped canvas point
 function snapCanvasToGrid(canvasPt, inchStep){
   const f = pxToField(canvasPt.x, canvasPt.y);
   const xs = Math.round(f.x / inchStep) * inchStep;
   const ys = Math.round(f.y / inchStep) * inchStep;
-  // field -> image px -> canvas px
   const ip = fieldToImagePx(xs, ys);
   const { imgRect } = layout();
   const cx = imgRect.x + ip.x * (imgRect.w / (state.img?.width || 1));
@@ -255,9 +263,7 @@ function snapCanvasToGrid(canvasPt, inchStep){
   return { x: cx, y: cy };
 }
 
-// show hover label after idle delay over field
 function handleHoverIdle(m){
-  // always hide tooltip on movement
   state.hoverPos = m;
   state.hoverActive = false;
 
@@ -271,24 +277,21 @@ function handleHoverIdle(m){
     return;
   }
 
-  // redraw now so the tooltip disappears immediately
   draw();
 
-  // after idle delay, show again
   state._hoverTimer = setTimeout(()=>{
     state.hoverActive = true;
     draw();
-  }, 500); // 0.5s idle
+  }, 500);
 }
 
 // Degrees formatting for the Selected heading input
 function formatDegForUI(rad){
+  // Use UI’s wrap setting via state.headingWrapHalf (normalize already used for half-wrap)
   if (state.headingWrapHalf){
-    // −180…+180
-    const d = (normalize(rad) * 180 / Math.PI);
+    let d = (normalize(rad) * 180 / Math.PI);
     return d;
   } else {
-    // 0…360
     let d = (rad * 180 / Math.PI) % 360;
     if (d < 0) d += 360;
     return d;

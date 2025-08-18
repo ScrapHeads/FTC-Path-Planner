@@ -20,10 +20,10 @@ export function draw(){
       ctx.fillText('Load a field image', imgRect.x+16, imgRect.y+28);
     }
 
-    drawPoints();           // path + waypoints (respects preview + locks)
-    drawMeasurement();      // measure overlay (snapped while measuring)
-    drawHoverLabel();       // X/Y tooltip after idle
-    if (state.hudVisible) drawHUD(); // mini cheatsheet
+    drawPoints();
+    drawMeasurement();
+    drawHoverLabel();
+    if (state.hudVisible) drawHUD();
   }catch(err){
     console.error(err);
     alert('Render error: ' + err.message);
@@ -97,11 +97,15 @@ function drawPoints(){
     const isSel = i === state.selected;
     const isLocked = !!p.locked;
 
+    // Field 0 = North, CCW positive → Canvas angle is clockwise (y-down)
+    // angCanvas = -(θ_field + π/2)
+    const angCanvas = -(p.headingRad + Math.PI/2);
+
     // robot footprint for visible points only
     if(!isFuture && lenPxCanvas>0 && widPxCanvas>0){
       ctx.save();
       ctx.translate(cx, cy);
-      const angle = els.boxRotate.checked ? p.headingRad : 0;
+      const angle = els.boxRotate.checked ? angCanvas : 0;
       ctx.rotate(angle);
       ctx.globalAlpha = 0.12; ctx.fillStyle = isLocked ? '#f59e0b' : '#22c55e';
       ctx.fillRect(-widPxCanvas/2, -lenPxCanvas/2, widPxCanvas, lenPxCanvas);
@@ -117,9 +121,9 @@ function drawPoints(){
     ctx.strokeStyle = isLocked ? '#f59e0b' : (isFuture ? 'rgba(148,163,184,0.35)' : '#94a3b8');
     ctx.stroke();
 
-    // heading handle
-    const hx = cx + Math.cos(p.headingRad) * handleLen;
-    const hy = cy + Math.sin(p.headingRad) * handleLen;
+    // heading handle (uses CANVAS angle)
+    const hx = cx + Math.cos(angCanvas) * handleLen;
+    const hy = cy + Math.sin(angCanvas) * handleLen;
     ctx.save();
     if (isLocked) ctx.setLineDash([6,4]);
     ctx.strokeStyle = isFuture ? 'rgba(148,163,184,0.35)' : (isLocked ? '#f59e0b' : '#94a3b8');
@@ -128,10 +132,10 @@ function drawPoints(){
     ctx.restore();
 
     if(!isFuture){
-      drawArrow(hx, hy, p.headingRad, isLocked ? '#f59e0b' : '#94a3b8');
+      drawArrow(hx, hy, angCanvas, isLocked ? '#f59e0b' : '#94a3b8');
     }
 
-    // label with lock glyph
+    // label
     ctx.fillStyle = isFuture ? 'rgba(11,15,20,0.6)' : '#0b0f14';
     ctx.font = `${12*dpi}px sans-serif`;
     const label = isLocked ? `🔒 ${i+1}` : String(i+1);
@@ -156,29 +160,25 @@ function drawMeasurement(){
   ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
   ctx.setLineDash([]);
 
-  // compute distance & bearing in FIELD units (already snapped)
+  // distance & bearing in FIELD units (0 at +X/North, CCW+)
   const fa = pxToField(a.x, a.y);
   const fb = pxToField(b.x, b.y);
   const dx = fb.x - fa.x, dy = fb.y - fa.y;
-  const dist = Math.hypot(dx, dy);  // inches
-
+  const dist = Math.hypot(dx, dy);
   const angRad = Math.atan2(dy, dx);
+
   let angDeg;
   if (state.headingWrapHalf){
-    // −180…+180
     let d = angRad * 180 / Math.PI;
-    // normalize via add/sub 360
     if (d <= -180) d += 360;
     if (d > 180) d -= 360;
     angDeg = d;
   } else {
-    // 0…360
     let d = (angRad * 180 / Math.PI) % 360;
     if (d < 0) d += 360;
     angDeg = d;
   }
 
-  // label near end point
   const pad = 6*dpi;
   const text = `${dist.toFixed(2)} in • ${angDeg.toFixed(1)}°`;
   ctx.font = `${12*dpi}px sans-serif`;
@@ -193,7 +193,6 @@ function drawMeasurement(){
 }
 
 function drawHoverLabel(){
-  // Do not show the tooltip while measuring
   if (state.measureActive) return;
   if (!state.hoverActive || !state.imgLoaded) return;
 
