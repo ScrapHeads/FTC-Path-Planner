@@ -3,49 +3,49 @@ import { state } from './state.js';
 import { layout, pxToField } from './layout.js';
 import { normalize, sanitizeJavaIdent, sanitizeFileBase, mimeForName, wrapRadFull } from './utils.js';
 
-export function initExport(){
-  els.exportBtn.addEventListener('click', ()=> doExport());
-  els.copyBtn.addEventListener('click', ()=>{
+export function initExport() {
+  els.exportBtn.addEventListener('click', () => doExport());
+  els.copyBtn.addEventListener('click', () => {
     doExport();
     const txt = els.output.textContent || '';
-    if(!txt) return;
-    navigator.clipboard.writeText(txt).then(()=>{
+    if (!txt) return;
+    navigator.clipboard.writeText(txt).then(() => {
       els.copyBtn.textContent = 'Copied!';
-      setTimeout(()=> els.copyBtn.textContent='Copy to clipboard', 1000);
+      setTimeout(() => els.copyBtn.textContent = 'Copy to clipboard', 1000);
     });
   });
 
   const toggleJavaFields = () => {
     const isJavaClass = els.exportFileType.value === 'java-class';
-    els.className.disabled  = false;
+    els.className.disabled = false;
     els.packageName.disabled = !isJavaClass;
   };
   els.exportFileType.addEventListener('change', toggleJavaFields);
   toggleJavaFields();
 
   if (els.chooseDirBtn) {
-    els.chooseDirBtn.addEventListener('click', async ()=>{
+    els.chooseDirBtn.addEventListener('click', async () => {
       if (!window.showDirectoryPicker) {
         alert('Your browser does not support choosing a folder. Use "Save to file…" instead.');
         return;
       }
-      try{
+      try {
         state.chosenDirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
         els.chooseDirBtn.textContent = 'Folder selected';
-        setTimeout(()=> els.chooseDirBtn.textContent = 'Choose folder…', 1200);
-      }catch(err){
+        setTimeout(() => els.chooseDirBtn.textContent = 'Choose folder…', 1200);
+      } catch (err) {
         if (err.name !== 'AbortError') console.error(err);
       }
     });
   }
 
   if (els.saveFileBtn) {
-    els.saveFileBtn.addEventListener('click', async ()=>{
+    els.saveFileBtn.addEventListener('click', async () => {
       doExport();
       const payload = els.output._exportPayload;
       if (!payload) { alert('Nothing to save. Click Preview first.'); return; }
 
-      try{
+      try {
         if (state.chosenDirHandle && (await verifyWritableDir(state.chosenDirHandle))) {
           await writeIntoDirectory(state.chosenDirHandle, payload.suggestedName, payload.content);
         } else if (window.showSaveFilePicker) {
@@ -54,7 +54,7 @@ export function initExport(){
           await w.write(payload.content);
           await w.close();
         } else {
-          const blob = new Blob([payload.content], {type: payload.mime});
+          const blob = new Blob([payload.content], { type: payload.mime });
           const a = document.createElement('a');
           a.href = URL.createObjectURL(blob);
           a.download = payload.suggestedName;
@@ -62,8 +62,8 @@ export function initExport(){
           URL.revokeObjectURL(a.href);
         }
         els.saveFileBtn.textContent = 'Saved';
-        setTimeout(()=> els.saveFileBtn.textContent='Save to file…', 1200);
-      }catch(err){
+        setTimeout(() => els.saveFileBtn.textContent = 'Save to file…', 1200);
+      } catch (err) {
         if (err.name !== 'AbortError') {
           console.error(err);
           alert('Save failed: ' + err.message);
@@ -73,28 +73,28 @@ export function initExport(){
   }
 }
 
-async function verifyWritableDir(dirHandle){
+async function verifyWritableDir(dirHandle) {
   if (!dirHandle.requestPermission) return true;
-  const perm = await dirHandle.queryPermission({mode:'readwrite'});
+  const perm = await dirHandle.queryPermission({ mode: 'readwrite' });
   if (perm === 'granted') return true;
-  const p2 = await dirHandle.requestPermission({mode:'readwrite'});
+  const p2 = await dirHandle.requestPermission({ mode: 'readwrite' });
   return p2 === 'granted';
 }
 
-async function writeIntoDirectory(dirHandle, filename, content){
-  const fileHandle = await dirHandle.getFileHandle(filename, {create:true});
+async function writeIntoDirectory(dirHandle, filename, content) {
+  const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
   const w = await fileHandle.createWritable();
   await w.write(content);
   await w.close();
 }
 
-export function doExport(){
+export function doExport() {
   const fieldInches = parseFloat(els.fieldInches.value || '144');
-  const robotLenIn  = parseFloat(els.robotLenIn.value || '18');
-  const robotWidIn  = parseFloat(els.robotWidIn.value || '18');
+  const robotLenIn = parseFloat(els.robotLenIn.value || '18');
+  const robotWidIn = parseFloat(els.robotWidIn.value || '18');
 
-  const poses = state.points.map((p,i)=>{
-    const {imgRect} = layout();
+  const poses = state.points.map((p, i) => {
+    const { imgRect } = layout();
     const cx = imgRect.x + p.xPx * (imgRect.w / state.img.width);
     const cy = imgRect.y + p.yPx * (imgRect.h / state.img.height);
     const f = pxToField(cx, cy);
@@ -102,11 +102,11 @@ export function doExport(){
     const hNorm = normalize(p.headingRad);
     const h = state.headingWrapHalf ? hNorm : wrapRadFull(hNorm);
 
-    return {i, x:f.x, y:f.y, h, locked: !!p.locked};
+    return { i, x: f.x, y: f.y, h, locked: !!p.locked };
   });
 
   const cfg = {
-    lib: els.javaType.value,            // 'rr' | 'ftclib'
+    lib: els.javaType.value,            // 'rr' | 'ftclib' | 'RilLib'
     kind: els.exportKind.value,         // 'list' | 'array'
     fileType: els.exportFileType.value, // 'java-class' | 'java-snippet' | 'json' | 'csv'
     pkg: (els.packageName?.value || '').trim(),
@@ -114,19 +114,43 @@ export function doExport(){
     fieldInches, robotLenIn, robotWidIn
   };
 
-  const {content, preview, suggestedName} = buildExportArtifacts(poses, cfg);
+  const { content, preview, suggestedName } = buildExportArtifacts(poses, cfg);
 
   els.output.textContent = preview;
-  els.output._exportPayload = {content, suggestedName, mime: mimeForName(suggestedName)};
+  els.output._exportPayload = { content, suggestedName, mime: mimeForName(suggestedName) };
 }
 
-function buildExportArtifacts(poses, cfg){
-  const ctorImport = (cfg.lib==='rr'
-    ? 'com.acmerobotics.roadrunner.Pose2d'
-    : 'com.arcrobotics.ftclib.geometry.Pose2d');
+function getJavaExportConfig(lib) {
+  switch(lib) {
+    case 'rr':
+      return {
+        imports: ['com.acmerobotics.roadrunner.geometry.Pose2d'],
+        poseCtor: (x, y, h) => `new Pose2d(${x}, ${y}, ${h})`
+      };
+    case 'ftclib':
+      return {
+        imports: ['com.arcrobotics.ftclib.geometry.Pose2d'],
+        poseCtor: (x, y, h) => `new Pose2d(${x}, ${y}, ${h})`
+      };
+    case 'RilLib':
+      return {
+        imports: [
+          'org.firstinspires.ftc.teamcode.RilLib.Math.Geometry.Pose2d',
+          'org.firstinspires.ftc.teamcode.RilLib.Math.Geometry.Rotation2d'
+        ],
+        poseCtor: (x, y, h) => `new Pose2d(${x}, ${y}, new Rotation2d(${h}))`
+      };
+    default:
+      throw new Error('Unknown library: ' + lib);
+  }
+}
+
+function buildExportArtifacts(poses, cfg) {
+  const { imports, poseCtor } = getJavaExportConfig(cfg.lib);
+  const importLines = imports.map(i => `import ${i};`).join('\n');
 
   const className = sanitizeJavaIdent(cfg.cls || 'AutoPath');
-  const fileBase  = sanitizeFileBase(cfg.cls || 'AutoPath');
+  const fileBase = sanitizeFileBase(cfg.cls || 'AutoPath');
 
   // ---------- JSON ----------
   if (cfg.fileType === 'json') {
@@ -139,7 +163,7 @@ function buildExportArtifacts(poses, cfg){
         robotLenIn: +cfg.robotLenIn,
         robotWidIn: +cfg.robotWidIn
       },
-      poses: poses.map(p => ({ x:+p.x, y:+p.y, headingRad:+p.h, locked: !!p.locked }))
+      poses: poses.map(p => ({ x: +p.x, y: +p.y, headingRad: +p.h, locked: !!p.locked }))
     }, null, 2);
     return { content, preview: content, suggestedName: `${fileBase}.json` };
   }
@@ -153,15 +177,15 @@ function buildExportArtifacts(poses, cfg){
       `# robotWidIn=${+cfg.robotWidIn}`,
       'index,x_in,y_in,heading_rad,heading_deg,locked'
     ];
-    poses.forEach((p,i)=>{
+    poses.forEach((p, i) => {
       let deg = p.h * 180 / Math.PI;
-      if (!state.headingWrapHalf){
+      if (!state.headingWrapHalf) {
         deg = deg % 360; if (deg < 0) deg += 360;
       } else {
         if (deg <= -180) deg += 360;
         if (deg > 180) deg -= 360;
       }
-      lines.push([i+1, p.x.toFixed(2), p.y.toFixed(2), p.h.toFixed(6), deg.toFixed(3), p.locked?'true':'false'].join(','));
+      lines.push([i + 1, p.x.toFixed(2), p.y.toFixed(2), p.h.toFixed(6), deg.toFixed(3), p.locked ? 'true' : 'false'].join(','));
     });
     const csv = lines.join('\n');
     return { content: csv, preview: csv, suggestedName: `${fileBase}.csv` };
@@ -169,7 +193,7 @@ function buildExportArtifacts(poses, cfg){
 
   // ---------- Java (snippet/class) ----------
   const headerComment =
-`// headingWrapHalf=${!!state.headingWrapHalf}
+    `// headingWrapHalf=${!!state.headingWrapHalf}
 // fieldInches=${+cfg.fieldInches}
 // robotLenIn=${+cfg.robotLenIn}
 // robotWidIn=${+cfg.robotWidIn}
@@ -177,22 +201,22 @@ function buildExportArtifacts(poses, cfg){
 
   const poseLines = poses.map((p, idx) => {
     let deg = p.h * 180 / Math.PI;
-    if (!state.headingWrapHalf){ deg = deg % 360; if (deg < 0) deg += 360; }
+    if (!state.headingWrapHalf) { deg = deg % 360; if (deg < 0) deg += 360; }
     else { if (deg <= -180) deg += 360; if (deg > 180) deg -= 360; }
     const degStr = deg.toFixed(1);
     const comma = (idx < poses.length - 1) ? ',' : '';
     const lockTag = p.locked ? ' locked=true' : '';
-    return `    new Pose2d(${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.h.toFixed(6)})${comma}  // #${idx+1}  x=${p.x.toFixed(2)}in, y=${p.y.toFixed(2)}in, θ=${degStr}°${lockTag}`;
+    return `    ${poseCtor(p.x.toFixed(2), p.y.toFixed(2), p.h.toFixed(6))}${comma}  // #${idx+1}  x=${p.x.toFixed(2)}in, y=${p.y.toFixed(2)}in, θ=${degStr}°${lockTag}`;
   }).join('\n');
 
   const snippet = (cfg.kind === 'list')
     ? `${headerComment}import java.util.*;
-import ${ctorImport};
+${importLines};
 
 List<Pose2d> path = Arrays.asList(
 ${poseLines}
 );`
-    : `${headerComment}import ${ctorImport};
+    : `${headerComment}${importLines};
 
 Pose2d[] path = new Pose2d[]{
 ${poseLines}
@@ -209,7 +233,7 @@ ${poseLines}
     : 'public static final Pose2d[] PATH = new Pose2d[]{\n' + poseLines + '\n};';
 
   const javaClass = `${pkgLine}${headerComment}import java.util.*;
-import ${ctorImport};
+${importLines}
 
 public final class ${className} {
     private ${className}() {}

@@ -136,38 +136,39 @@ async function importWaypointsFromText(text, filename){
   }
 
   // -------- Java / TXT --------
-  if(ext==='java' || ext==='txt' || lower.includes('pose2d')){
-    // Header comments
-    const getKV = (k) => {
-      const m = text.match(new RegExp(`${k}\\s*=\\s*([^\\n\\r]+)`, 'i'));
-      return m ? m[1].trim() : undefined;
-    };
-    const wrap = getKV('headingWrapHalf');
-    const fin  = getKV('fieldInches');
-    const rlen = getKV('robotLenIn');
-    const rwid = getKV('robotWidIn');
+if(ext==='java' || ext==='txt' || lower.includes('pose2d')){
+  // Header comments
+  const getKV = (k) => {
+    const m = text.match(new RegExp(`${k}\\s*=\\s*([^\\n\\r]+)`, 'i'));
+    return m ? m[1].trim() : undefined;
+  };
+  const wrap = getKV('headingWrapHalf');
+  const fin  = getKV('fieldInches');
+  const rlen = getKV('robotLenIn');
+  const rwid = getKV('robotWidIn');
 
-    if (wrap !== undefined){
-      state.headingWrapHalf = (wrap.toLowerCase() === 'true');
-      if (els.headingWrap) els.headingWrap.checked = state.headingWrapHalf;
-    }
-    if (fin  !== undefined) els.fieldInches.value = String(+fin);
-    if (rlen !== undefined) els.robotLenIn.value  = String(+rlen);
-    if (rwid !== undefined) els.robotWidIn.value  = String(+rwid);
-
-    // Pose lines
-    const regex = /new\s+Pose2d\s*\(\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d*\.?\d+)\s*\).*?(locked\s*=\s*(true|false))?/g;
-    const poses = [];
-    let m;
-    while((m = regex.exec(text)) !== null){
-      const locked = m[5] ? (m[5].toLowerCase()==='true') : false;
-      poses.push({x: parseFloat(m[1]), y: parseFloat(m[2]), h: parseFloat(m[3]), locked});
-    }
-    if(!poses.length) throw new Error('No Pose2d entries found in Java file.');
-    loadPosesIntoPoints(poses);
-    return;
+  if (wrap !== undefined){
+    state.headingWrapHalf = (wrap.toLowerCase() === 'true');
+    if (els.headingWrap) els.headingWrap.checked = state.headingWrapHalf;
   }
+  if (fin  !== undefined) els.fieldInches.value = String(+fin);
+  if (rlen !== undefined) els.robotLenIn.value  = String(+rlen);
+  if (rwid !== undefined) els.robotWidIn.value  = String(+rwid);
 
+  // Pose lines: support both h and new Rotation2d(h)
+  const regex = /new\s+Pose2d\s*\(\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d*\.?\d+)\s*,\s*(?:new\s+Rotation2d\s*\(\s*([-+]?\d*\.?\d+)\s*\)|([-+]?\d*\.?\d+))\s*\).*?(locked\s*=\s*(true|false))?/g;
+  const poses = [];
+  let m;
+  while((m = regex.exec(text)) !== null){
+    const locked = m[6] ? (m[6].toLowerCase()==='true') : false;
+    // h can be in m[3] (Rotation2d) or m[4] (plain)
+    const h = m[3] !== undefined ? parseFloat(m[3]) : parseFloat(m[4]);
+    poses.push({x: parseFloat(m[1]), y: parseFloat(m[2]), h, locked});
+  }
+  if(!poses.length) throw new Error('No Pose2d entries found in Java file.');
+  loadPosesIntoPoints(poses);
+  return;
+}
   throw new Error('Unsupported file type.');
 }
 
