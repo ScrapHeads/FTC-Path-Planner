@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>FTC Field Path Picker → Pose2d</title>
+  <title>FTC Field Path Planner</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -29,22 +29,31 @@
         <select id="sampleSelect">
           <option value="">— none —</option>
           <option value="ReferenceImages\into-the-deep.png">Roadrunner into the deep image</option>          
-          <option value="ReferenceImages\decode.webp">decode image</option>
+          <option value="ReferenceImages\decode.webp">Roadrunner decode image</option>
         </select>
       </div>
     </div>
 
     <div class="grid-2">
       <div>
-        <label>Field width (inches)</label>
+        <label>Field size (chosen unit)</label>
         <input id="fieldInches" type="number" value="144" />
       </div>
       <div>
-        <label>Origin</label>
+        <label>Origin (0, 0)</label>
         <select id="originSelect">
-          <option value="center">Center (0,0 at field center)</option>
+          <option value="center">Center</option>
           <option value="bottomLeft">Bottom-left corner</option>
           <option value="topLeft">Top-left corner</option>
+        </select>
+      </div>
+      <div>
+        <label>Unit used</label>
+        <select id="measurements">
+          <option value="meters">Meters</option>
+          <option value="centimeters">Centimeters</option>
+          <option value="feet">Feet</option>
+          <option value="inches">Inches</option>
         </select>
       </div>
     </div>
@@ -101,7 +110,7 @@
         <span>Wrap headings to <b>±180°</b> for display and <b>±π</b> on export</span>
       </label>
     </div>
-    <div class="small">Off = show 0–360° and export radians in [0, 2π). On = show −180…+180° and export radians in (−π, +π].</div>
+    <div class="small">Off = show 0-360° and export radians in [0, 2π). On = show -180…+180° and export radians in (−π, +π].</div>
 
     <!-- Robot footprint (rectangle) -->
     <h2>Robot footprint</h2>
