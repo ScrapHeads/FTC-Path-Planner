@@ -10,12 +10,7 @@
 <div class="app">
   <!-- LEFT: Config / Tools (scrolls independently) -->
   <div class="left">
-    <h1>FTC Field Path Planner</h1>
-    <div class="small">
-      Press <b>N</b> to add a waypoint at the cursor. Click a point to select. Drag point to move
-      (hold <b>Shift</b> to nudge by <b>0.5″</b>). Drag handle or use <b>Q/E</b> to rotate
-      (hold <b>Shift</b> for 15° snap). Output is in <b>radians</b> for Java.
-    </div>
+    <h1>FTC Path Planner</h1>
 
     <h2>1) Field Image</h2>
     <div class="grid-2">
@@ -58,14 +53,6 @@
       </div>
     </div>
 
-    <div class="row">
-      <label>
-        <input id="axesFtc" type="checkbox" checked />
-        <span id="axesText">Axes mode: <b>X+ forward</b>, <b>Y+ left</b></span>
-      </label>
-    </div>
-    <div class="small">Coordinates are computed in <b>inches</b>. Toggle switches coordinate axes.</div>
-
     <h2>2) Waypoints</h2>
     <div class="toolbar">
       <button id="undoBtn">Undo</button>
@@ -103,7 +90,7 @@
       </div>
     </div>
 
-    <!-- NEW: Heading loop toggle -->
+    <!-- Heading loop toggle -->
     <div class="row" style="margin-top:8px">
       <label class="row">
         <input id="headingWrap" type="checkbox" />
@@ -126,6 +113,13 @@
     </div>
     <div class="row" style="margin-top:6px">
       <label><input id="boxRotate" type="checkbox" checked /> Align with heading</label>
+    </div>
+
+    <div class="row">
+      <label>
+        <input id="axesFtc" type="checkbox" checked />
+        <span id="axesText">Axes toggle: <b>X+ forward</b>, <b>Y+ left</b></span>
+      </label>
     </div>
 
     <div class="list" style="margin-top:8px">
@@ -190,14 +184,14 @@
     <div class="small" style="margin-top:6px">
       Tip: use “Choose folder…” and select your repo directory, e.g.
       <code>TeamCode/src/main/java/org/firstinspires/ftc/teamcode/auto/paths</code>,
-      then “Save to file…” writes directly there (Chrome/Edge).
+      then “Save to file…” writes directly there.
     </div>
   </div>
 
   <!-- RIGHT: Canvas (stays fixed; no scroll) -->
   <div class="right">
     <div class="row">
-      <span class="pill">N: add point @ cursor</span>
+      <span class="pill">N: add point at cursor</span>
       <span class="pill">Click point: select</span>
       <span class="pill">Drag point: move (Shift=0.5″)</span>
       <span class="pill">Drag handle / Q,E: rotate (Shift=15°)</span>

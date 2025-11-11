@@ -54,11 +54,11 @@ export function isFtc(){ return !!els.axesFtc?.checked; }
 export function updateAxesUI(){
   if(!els.axesText || !els.thX || !els.thY) return;
   if(isFtc()){
-    els.axesText.innerHTML = 'Axes mode: <b>X+ forward</b>, <b>Y+ left</b>';
+    els.axesText.innerHTML = 'Axes toggle: <b>X+ forward</b>, <b>Y+ left</b>';
     els.thX.textContent = 'X fwd (+)';
     els.thY.textContent = 'Y left (+)';
   } else {
-    els.axesText.innerHTML = 'Axes mode: <b>X+ right</b>, <b>Y+ down</b>';
+    els.axesText.innerHTML = 'Axes toggle: <b>X+ right</b>, <b>Y+ down</b>';
     els.thX.textContent = 'X right (+)';
     els.thY.textContent = 'Y down (+)';
   }
