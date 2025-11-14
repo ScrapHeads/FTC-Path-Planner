@@ -12,12 +12,11 @@
   <div class="left">
     <h1>FTC Path Planner</h1>
 
-    <h2>1) Field Image</h2>
+    <h2>1) Field</h2>
     <div class="grid-2">
       <div>
-        <label>Load image (PNG/JPG/SVG/WebP/BMP/GIF)</label>
+        <label>Load image (PNG/JPG/SVG/WebP/BMP)</label>
         <input id="imgInput" type="file" accept="image/*" />
-        <div class="small">Tip: SVG/WebP work too. Animated GIFs load the first frame.</div>
       </div>
       <div>
         <label>Sample image</label>
@@ -93,8 +92,13 @@
     <!-- Heading loop toggle -->
     <div class="row" style="margin-top:8px">
       <label class="row">
-        <input id="headingWrap" type="checkbox" />
-        <span>Wrap headings to <b>±180°</b> for display and <b>±π</b> on export</span>
+        <div class="custom-checkbox-wrapper">
+          <input type="checkbox" id="headingWrap" class="hidden-checkbox">
+          <label for="headingWrap"  class="custom-checkbox-label">
+            <span class="custom-checkbox-box"></span>
+            Wrap headings to <b>±180°</b> for display and <b>±π</b> on export
+          </label>
+        </div>
       </label>
     </div>
     <div class="small">Off = show 0-360° and export radians in [0, 2π). On = show -180…+180° and export radians in (−π, +π].</div>
@@ -112,13 +116,17 @@
       </div>
     </div>
     <div class="row" style="margin-top:6px">
-      <label><input id="boxRotate" type="checkbox" checked /> Align with heading</label>
+      <label><input id="boxRotate" type="checkbox" class="hidden-checkbox" checked /> Align with heading</label>
     </div>
 
     <div class="row">
       <label>
-        <input id="axesFtc" type="checkbox" checked />
-        <span id="axesText">Axes toggle: <b>X+ forward</b>, <b>Y+ left</b></span>
+        <div class="custom-checkbox-wrapper"></div>
+          <input id="axesFtc" type="checkbox" class="hidden-checkbox" checked />
+          <label for="axesFtc" class="custom-checkbox-label">
+            <span class="custom-checkbox-box"></span>
+            Axes toggle: <b>X+ forward,</b> <b>Y+ left</b>
+          </label>     
       </label>
     </div>
 

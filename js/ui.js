@@ -142,8 +142,13 @@ function installPreviewControls(){
   wrap.innerHTML = `
     <h2>Preview / Step-through</h2>
     <label class="row">
-      <input type="checkbox" id="previewToggle">
-      <span>Enable preview</span>
+      <div class="custom-checkbox-wrapper">
+        <input type="checkbox" id="previewToggle" class="hidden-checkbox">
+        <label for="previewToggle" class="custom-checkbox-label">
+          <span class="custom-checkbox-box"></span>
+          Enable preview
+        </label>
+      </div>
     </label>
     <div class="row">
       <button id="previewPrev" title="Previous [">Prev</button>
@@ -155,8 +160,13 @@ function installPreviewControls(){
       <input type="range" id="previewSlider" min="-1" max="-1" value="-1" step="1" style="width:100%">
     </div>
     <label class="row">
-      <input type="checkbox" id="dimFutureToggle" checked>
-      <span>Dim future points</span>
+      <div class="custom-checkbox-wrapper">
+        <input type="checkbox" id="dimFutureToggle" class="hidden-checkbox" checked>
+        <label for="dimFutureToggle" class="custom-checkbox-label">
+          <span class="custom-checkbox-box"></span>
+          Dim future points
+        </label>
+      </div>
     </label>
     <small id="previewStatus" class="small"></small>
   `;
@@ -213,12 +223,12 @@ function installTransformControls(){
   wrap.innerHTML = `
     <h2>Transform (Mirror / Rotate)</h2>
     <div class="row">
-      <button id="flipXBtn" title="Mirror across X axis (Y→−Y)">Mirror X</button>
-      <button id="flipYBtn" title="Mirror across Y axis (X→−X)">Mirror Y</button>
+      <button id="flipXBtn" title="Mirror across X axis (Y→-Y)">Mirror X</button>
+      <button id="flipYBtn" title="Mirror across Y axis (X→-X)">Mirror Y</button>
     </div>
     <div class="row">
       <button id="rotCCWBtn" title="Rotate +90°">⟲ 90°</button>
-      <button id="rotCWBtn"  title="Rotate −90°">⟳ 90°</button>
+      <button id="rotCWBtn"  title="Rotate -90°">⟳ 90°</button>
       <button id="rot180Btn" title="Rotate 180°">180°</button>
     </div>
     <small class="small">Transforms use current origin/axes and apply to all points.</small>
@@ -400,7 +410,7 @@ function getSelY(){ return parseFloat(els.selYIn.value || '0'); }
 // Format degrees based on wrapping preference
 function formatDeg(rad){
   if (state.headingWrapHalf){
-    // −180…+180
+    // -180…+180
     let d = (normalize(rad) * 180 / Math.PI);
     return d;
   } else {

@@ -97,6 +97,67 @@ code{
   scrollbar-color: var(--accent) var(--panel); /* thumb, track */
 }
 
+/* Checkbox */
+.custom-checkbox-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 9px; /* Space between checkbox and label text */
+  grid-area: 9px;
+  cursor: pointer;
+}
+
+.hidden-checkbox {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.custom-checkbox-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-family: sans-serif;
+  color: var(--text);
+  gap: 9px;
+}
+
+.custom-checkbox-box {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--muted);
+  border-radius: 4px;
+  background-color: var(--bg);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: all 0.2s ease-in-out;
+}
+
+.custom-checkbox-box::after {
+  content: '';
+  width: 7px;
+  height: 7px;
+  background-color: var(--muted); /* Initial hidden state */
+  border-radius: 1px;
+  transform: scale(0);
+  transition: transform 0.2s ease-in-out, background-color 0.2s ease-in-out;
+}
+
+.hidden-checkbox:checked + .custom-checkbox-label .custom-checkbox-box {
+  border-color: var(--accent);
+  background-color: var(--accent);
+}
+
+.hidden-checkbox:checked + .custom-checkbox-label .custom-checkbox-box::after {
+  transform: scale(1);
+  background-color: #fff; /* Checkmark color */
+}
+
+.hidden-checkbox:focus + .custom-checkbox-label .custom-checkbox-box {
+  box-shadow: 0 0 0 1px var(--accent); /* Focus indicator */
+}
+
 
 /* UI bits */
 h1{font-size:18px;margin:0 0 10px 0}
