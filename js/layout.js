@@ -11,7 +11,7 @@ export function setCanvasSize(){
 
 export function pxPerInch(){
   if(!state.imgLoaded) return 1;
-  const fieldIn = parseFloat(els.fieldInches.value || '144');
+  const fieldIn = parseFloat(els.fieldSize.value || '144');
   const side = Math.min(state.img.width, state.img.height);
   return side / fieldIn;
 }

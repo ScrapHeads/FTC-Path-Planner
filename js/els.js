@@ -7,7 +7,8 @@ export const els = {
   // Image + config
   imgInput: document.getElementById('imgInput'),
   sampleSelect: document.getElementById('sampleSelect'),
-  fieldInches: document.getElementById('fieldInches'),
+  fieldSize: document.getElementById('fieldSize'),
+  measurmentUnit: document.getElementById('measurementsUnit'),
   originSelect: document.getElementById('originSelect'),
   axesFtc: document.getElementById('axesFtc'),
   axesText: document.getElementById('axesText'),
