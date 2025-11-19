@@ -47,9 +47,10 @@ async function importWaypointsFromText(text, filename) {
       state.headingWrapHalf = !!wrapVal;
       if (els.headingWrap) els.headingWrap.checked = state.headingWrapHalf;
     }
-    if (meta.fieldInches !== undefined) els.fieldInches.value = String(+meta.fieldInches);
+    if (meta.fieldSize !== undefined) els.fieldSize.value = String(+meta.fieldSize);
     if (meta.robotLenIn !== undefined) els.robotLenIn.value = String(+meta.robotLenIn);
     if (meta.robotWidIn !== undefined) els.robotWidIn.value = String(+meta.robotWidIn);
+    if (meta.measurementUnit !== undefined && els.measurementUnit) els.measurementUnit.value = meta.measurementUnit;
 
     if (Array.isArray(obj?.poses)) {
       // poses with headingRad and optional locked
@@ -89,12 +90,14 @@ async function importWaypointsFromText(text, filename) {
         if (key === 'headingwraphalf') {
           state.headingWrapHalf = (String(val).toLowerCase() === 'true');
           if (els.headingWrap) els.headingWrap.checked = state.headingWrapHalf;
-        } else if (key === 'fieldinches') {
-          els.fieldInches.value = String(+val);
+        } else if (key === 'fieldsize') {
+          els.fieldSize.value = String(+val);
         } else if (key === 'robotlenin') {
           els.robotLenIn.value = String(+val);
         } else if (key === 'robotwidin') {
           els.robotWidIn.value = String(+val);
+        } else if (key === 'measurementunit' && els.measurementUnit) {
+          els.measurementUnit.value = val;
         }
       }
       i++;
@@ -146,17 +149,19 @@ async function importWaypointsFromText(text, filename) {
     };
 
     const wrap = getKV('headingWrapHalf');
-    const fin = getKV('fieldInches');
+    const fin = getKV('fieldSize');
     const rlen = getKV('robotLenIn');
     const rwid = getKV('robotWidIn');
+    const munit = getKV('measurementUnit');
 
     if (wrap !== undefined) {
       state.headingWrapHalf = (wrap.toLowerCase() === 'true');
       if (els.headingWrap) els.headingWrap.checked = state.headingWrapHalf;
     }
-    if (fin !== undefined) els.fieldInches.value = String(+fin);
+    if (fin !== undefined) els.fieldSize.value = String(+fin);
     if (rlen !== undefined) els.robotLenIn.value = String(+rlen);
     if (rwid !== undefined) els.robotWidIn.value = String(+rwid);
+    if (munit !== undefined && els.measurementUnit) els.measurementUnit.value = munit;
 
     // ----------------------------------------
     // Pose2d line parser

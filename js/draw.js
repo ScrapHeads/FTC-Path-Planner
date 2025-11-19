@@ -1,6 +1,6 @@
 import { ctx, dpi, els } from './els.js';
 import { state, getVisibleWaypointCount } from './state.js';
-import { layout, pxPerInch, pxToField } from './layout.js';
+import { layout, pxPerMeter, pxToField } from './layout.js';
 
 export function draw(){
   try{
@@ -46,7 +46,7 @@ function drawPoints(){
   if(!state.imgLoaded) return;
   const R = 6 * dpi;
   const handleLen = 28 * dpi;
-  const ppi = pxPerInch();
+  const ppi = pxPerMeter();
   const {imgRect, imgToCanvas} = layout();
 
   const lenIn = Math.max(0, parseFloat(els.robotLenIn.value || '18'));

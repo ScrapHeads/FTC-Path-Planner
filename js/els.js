@@ -8,7 +8,7 @@ export const els = {
   imgInput: document.getElementById('imgInput'),
   sampleSelect: document.getElementById('sampleSelect'),
   fieldSize: document.getElementById('fieldSize'),
-  measurmentUnit: document.getElementById('measurementsUnit'),
+  measurementUnit: document.getElementById('measurementsUnit'),
   originSelect: document.getElementById('originSelect'),
   axesFtc: document.getElementById('axesFtc'),
   axesText: document.getElementById('axesText'),
@@ -63,4 +63,25 @@ export function updateAxesUI(){
     els.thX.textContent = 'X right (+)';
     els.thY.textContent = 'Y down (+)';
   }
+}
+
+export function getMeasurementUnit() {
+  // Returns the selected measurement unit (e.g., 'm', 'cm', 'in')
+  return els.measurementUnit.value;
+}
+
+export function toMeters(value) {
+  // Converts a value from the selected unit to meters
+  const unit = getMeasurementUnit();
+  if (unit === 'cm') return value / 100;
+  if (unit === 'ft') return value * 3.28084;
+  if (unit === 'in') return value * 0.0254;
+  return value; // already meters
+}
+
+export function fromMeters(value, targetUnit) {
+  // Converts a value in meters to the target unit
+  if (targetUnit === 'cm') return value * 100;
+  if (targetUnit === 'in') return value / 0.0254;
+  return value;
 }
