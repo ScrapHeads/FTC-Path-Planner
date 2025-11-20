@@ -48,8 +48,8 @@ async function importWaypointsFromText(text, filename) {
       if (els.headingWrap) els.headingWrap.checked = state.headingWrapHalf;
     }
     if (meta.fieldSize !== undefined) els.fieldSize.value = String(+meta.fieldSize);
-    if (meta.robotLenIn !== undefined) els.robotLenIn.value = String(+meta.robotLenIn);
-    if (meta.robotWidIn !== undefined) els.robotWidIn.value = String(+meta.robotWidIn);
+    if (meta.robotLenM !== undefined) els.robotLen.value = String(+meta.robotLenM);
+    if (meta.robotWidM !== undefined) els.robotWid.value = String(+meta.robotWidM);
     if (meta.measurementUnit !== undefined && els.measurementUnit) els.measurementUnit.value = meta.measurementUnit;
 
     if (Array.isArray(obj?.poses)) {

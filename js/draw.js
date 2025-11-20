@@ -49,8 +49,8 @@ function drawPoints(){
   const ppi = pxPerMeter();
   const {imgRect, imgToCanvas} = layout();
 
-  const lenIn = Math.max(0, parseFloat(els.robotLenIn.value || '18'));
-  const widIn = Math.max(0, parseFloat(els.robotWidIn.value || '18'));
+  const lenIn = Math.max(0, parseFloat(els.robotLen.value || '18'));
+  const widIn = Math.max(0, parseFloat(els.robotWid.value || '18'));
   const lenPxCanvas = lenIn * ppi * imgToCanvas;
   const widPxCanvas = widIn * ppi * imgToCanvas;
 

@@ -129,8 +129,8 @@ export function initUI(){
   });
 
   // Robot footprint options
-  els.robotLenIn.addEventListener('change', draw);
-  els.robotWidIn.addEventListener('change', draw);
+  els.robotLen.addEventListener('change', draw);
+  els.robotWid.addEventListener('change', draw);
   els.boxRotate.addEventListener('change', draw);
 }
 

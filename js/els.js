@@ -45,8 +45,8 @@ export const els = {
 
   // Canvas + footprint
   dropZone: document.getElementById('dropZone'),
-  robotLenIn: document.getElementById('robotLenIn'),
-  robotWidIn: document.getElementById('robotWidIn'),
+  robotLen: document.getElementById('robotLen'),
+  robotWid: document.getElementById('robotWid'),
   boxRotate: document.getElementById('boxRotate'),
 };
 

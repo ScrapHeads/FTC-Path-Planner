@@ -90,8 +90,8 @@ async function writeIntoDirectory(dirHandle, filename, content) {
 
 export function doExport() {
   const fieldMeters = toMeters(parseFloat(els.fieldSize.value || '144'));
-  const robotLenM = toMeters(parseFloat(els.robotLenM.value || '18'));
-  const robotWidM = toMeters(parseFloat(els.robotWidM.value || '18'));
+  const robotLenM = toMeters(parseFloat(els.robotLen.value || '18'));
+  const robotWidM = toMeters(parseFloat(els.robotWid.value || '18'));
   const measurementUnit = getMeasurementUnit();
   console.log('Exporting with measurement unit:', measurementUnit);
 
