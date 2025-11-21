@@ -82,6 +82,7 @@ export function toMeters(value) {
 export function fromMeters(value, targetUnit) {
   // Converts a value in meters to the target unit
   if (targetUnit === 'cm') return value * 100;
+  if (targetUnit === 'ft') return value * 3.28084;
   if (targetUnit === 'in') return value / 0.0254;
-  return value;
+  return value; // already meters
 }

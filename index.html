@@ -107,16 +107,23 @@
     <h2>Robot footprint</h2>
     <div class="grid-2">
       <div>
-        <label>Length (in)</label>
+        <label>Length (Selected measurement)</label>
         <input id="robotLen" type="number" step="0.5" value="18" />
       </div>
       <div>
-        <label>Width (in)</label>
+        <label>Width (Selected measurement)</label>
         <input id="robotWid" type="number" step="0.5" value="18" />
       </div>
     </div>
     <div class="row" style="margin-top:6px">
-      <label><input id="boxRotate" type="checkbox" class="hidden-checkbox" checked /> Align with heading</label>
+
+      <label>
+        <input id="boxRotate" type="checkbox" class="hidden-checkbox" checked />
+        <label for="boxRotate" class="custom-checkbox-label">
+          <span class="custom-checkbox-box"></span>
+          Align with heading
+        </label>
+      </label>
     </div>
 
     <div class="row">
