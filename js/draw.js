@@ -1,6 +1,6 @@
-import { ctx, dpi, els } from './els.js';
+import { ctx, dpi, els, getMeasurementUnit} from './els.js';
 import { state, getVisibleWaypointCount } from './state.js';
-import { layout, pxPerMeter, pxToField } from './layout.js';
+import { layout, pxPerFieldSize, pxToField } from './layout.js';
 
 export function draw(){
   try{
@@ -46,11 +46,11 @@ function drawPoints(){
   if(!state.imgLoaded) return;
   const R = 6 * dpi;
   const handleLen = 28 * dpi;
-  const ppi = pxPerMeter();
+  const ppi = pxPerFieldSize();
   const {imgRect, imgToCanvas} = layout();
 
-  const lenIn = Math.max(0, parseFloat(els.robotLen.value || '18'));
-  const widIn = Math.max(0, parseFloat(els.robotWid.value || '18'));
+  const lenIn = Math.max(0, parseFloat(els.robotLen.value || '0.4572'));
+  const widIn = Math.max(0, parseFloat(els.robotWid.value || '0.4572'));
   const lenPxCanvas = lenIn * ppi * imgToCanvas;
   const widPxCanvas = widIn * ppi * imgToCanvas;
 
@@ -202,7 +202,7 @@ function drawHoverLabel(){
   if (!within) return;
 
   const f = pxToField(m.x, m.y);
-  const text = `X ${f.x.toFixed(2)}  Y ${f.y.toFixed(2)} in`;
+  const text = `X ${f.x.toFixed(2)}  Y ${f.y.toFixed(2)} ${getMeasurementUnit()}`;
 
   ctx.save();
   ctx.font = `${12*dpi}px sans-serif`;

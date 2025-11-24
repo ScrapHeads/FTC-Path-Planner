@@ -9,9 +9,9 @@ export function setCanvasSize(){
   canvas.height = Math.max(240, Math.floor(h * dpi));
 }
 
-export function pxPerMeter(){
+export function pxPerFieldSize(){
   if(!state.imgLoaded) return 1;
-  const fieldM = toMeters(parseFloat(els.fieldSize.value || '3.66'));
+  const fieldM = els.fieldSize.value || '3.66';
   const side = Math.min(state.img.width, state.img.height);
   return side / fieldM;
 }
@@ -36,64 +36,64 @@ export function pxToField(cx, cy){
   const {imgRect} = layout();
   const ix = (cx - imgRect.x) * (state.img.width / imgRect.w);
   const iy = (cy - imgRect.y) * (state.img.height / imgRect.h);
-  const ppm = pxPerMeter();
+  const ppfs = pxPerFieldSize();
   const iw = state.img.width, ih = state.img.height;
   const origin = els.originSelect.value;
   const ftc = els.axesFtc.checked;
   let X, Y;
   if(ftc){
     if(origin === 'center'){
-      X = -(iy - ih/2) / ppm;
-      Y = -(ix - iw/2) / ppm;
+      X = -(iy - ih/2) / ppfs;
+      Y = -(ix - iw/2) / ppfs;
     } else if(origin === 'topLeft'){
-      X = -iy / ppm;
-      Y = -ix / ppm;
+      X = -iy / ppfs;
+      Y = -ix / ppfs;
     } else {
-      X = -(iy - ih) / ppm;
-      Y = -ix / ppm;
+      X = -(iy - ih) / ppfs;
+      Y = -ix / ppfs;
     }
   } else {
     if(origin === 'center'){
-      X =  (ix - iw/2) / ppm;
-      Y =  (iy - ih/2) / ppm;
+      X =  (ix - iw/2) / ppfs;
+      Y =  (iy - ih/2) / ppfs;
     } else if(origin === 'topLeft'){
-      X =  ix / ppm;
-      Y =  iy / ppm;
+      X =  ix / ppfs;
+      Y =  iy / ppfs;
     } else {
-      X =  ix / ppm;
-      Y =  (iy - ih) / ppm;
+      X =  ix / ppfs;
+      Y =  (iy - ih) / ppfs;
     }
   }
   return { x:X, y:Y };
 }
 
 export function fieldToImagePx(X, Y){
-  const ppm = pxPerMeter();
+  const ppfs = pxPerFieldSize();
   const iw = state.img.width, ih = state.img.height;
   const origin = els.originSelect.value;
   const ftc = els.axesFtc.checked;
   let ix, iy;
   if(ftc){
     if(origin === 'center'){
-      ix = (-Y)*ppm + iw/2;
-      iy = (-X)*ppm + ih/2;
+      ix = (-Y)*ppfs + iw/2;
+      iy = (-X)*ppfs + ih/2;
     } else if(origin === 'topLeft'){
-      ix = (-Y)*ppm;
-      iy = (-X)*ppm;
+      ix = (-Y)*ppfs;
+      iy = (-X)*ppfs;
     } else {
-      ix = (-Y)*ppm;
-      iy = ih - X*ppm;
+      ix = (-Y)*ppfs;
+      iy = ih - X*ppfs;
     }
   } else {
     if(origin === 'center'){
-      ix = X*ppm + iw/2;
-      iy = Y*ppm + ih/2;
+      ix = X*ppfs + iw/2;
+      iy = Y*ppfs + ih/2;
     } else if(origin === 'topLeft'){
-      ix = X*ppm;
-      iy = Y*ppm;
+      ix = X*ppfs;
+      iy = Y*ppfs;
     } else {
-      ix = X*ppm;
-      iy = Y*ppm + ih;
+      ix = X*ppfs;
+      iy = Y*ppfs + ih;
     }
   }
   return { x:ix, y:iy };

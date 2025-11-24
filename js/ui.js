@@ -268,7 +268,13 @@ export function updateTable(){
       <td>${f.y.toFixed(2)}</td>
       <td>${degStr}</td>
       <td>
-        <label class="locklab"><input type="checkbox" class="lock" data-idx="${i}" ${p.locked?'checked':''}/> lock</label>
+        <div class="custom-checkbox-wrapper">
+          <input type="checkbox" id="lock${i}" class="hidden-checkbox lock" data-idx="${i}" ${p.locked?'checked':''}>
+          <label for="lock${i}" class="custom-checkbox-label">
+            <span class="custom-checkbox-box"></span>
+            lock
+          </label>
+        </div>
       </td>
       <td>
         <button class="sel" data-idx="${i}">Select</button>

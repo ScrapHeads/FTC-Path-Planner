@@ -89,9 +89,9 @@ async function writeIntoDirectory(dirHandle, filename, content) {
 }
 
 export function doExport() {
-  const fieldMeters = toMeters(parseFloat(els.fieldSize.value || '144'));
-  const robotLenM = toMeters(parseFloat(els.robotLen.value || '18'));
-  const robotWidM = toMeters(parseFloat(els.robotWid.value || '18'));
+  const fieldSize = els.fieldSize.value || '144';
+  const robotLen = els.robotLen.value || '18';
+  const robotWid = els.robotWid.value || '18';
   const measurementUnit = getMeasurementUnit();
   console.log('Exporting with measurement unit:', measurementUnit);
 
@@ -113,7 +113,7 @@ export function doExport() {
     fileType: els.exportFileType.value, // 'java-class' | 'java-snippet' | 'json' | 'csv'
     pkg: (els.packageName?.value || '').trim(),
     cls: (els.className?.value || 'AutoPath').trim(),
-    fieldMeters, robotLenM, robotWidM,
+    fieldSize, robotLen, robotWid,
     measurementUnit
   };
 
@@ -162,9 +162,9 @@ function buildExportArtifacts(poses, cfg) {
         library: cfg.lib,
         format: cfg.kind,
         headingWrapHalf: !!state.headingWrapHalf,
-        fieldMeters: +cfg.fieldMeters,
-        robotLenM: +cfg.robotLenM,
-        robotWidM: +cfg.robotWidM,
+        fieldSize: +cfg.fieldSize,
+        robotLen: +cfg.robotLen,
+        robotWid: +cfg.robotWid,
         measurementUnit: cfg.measurementUnit
       },
       poses: poses.map(p => ({ x: +p.x, y: +p.y, headingRad: +p.h, locked: !!p.locked }))
@@ -176,9 +176,9 @@ function buildExportArtifacts(poses, cfg) {
   if (cfg.fileType === 'csv') {
     const lines = [
       `# headingWrapHalf=${!!state.headingWrapHalf}`,
-      `# fieldMeters=${+cfg.fieldMeters}`,
-      `# robotLenM=${+cfg.robotLenM}`,
-      `# robotWidM=${+cfg.robotWidM}`,
+      `# fieldSize=${+cfg.fieldSize}`,
+      `# robotLen=${+cfg.robotLen}`,
+      `# robotWid=${+cfg.robotWid}`,
       `# measurementUnit=${cfg.measurementUnit}`,
       'index,x_m,y_m,heading_rad,heading_deg,locked'
     ];
@@ -198,7 +198,9 @@ function buildExportArtifacts(poses, cfg) {
 
   // ---------- Java (snippet/class) ----------
   const headerComment =
-    `// headingWrapHalf=${!!state.headingWrapHalf}\n// fieldMeters=${+cfg.fieldMeters}\n// robotLenM=${+cfg.robotLenM}\n// robotWidM=${+cfg.robotWidM}\n// measurementUnit=${cfg.measurementUnit}\n`;
+    `// headingWrapHalf=${!!state.headingWrapHalf}\n// fieldSize=${+cfg.fieldSize}\n// robotLen=${+cfg.robotLen}\n// robotWid=${+cfg.robotWid}\n// measurementUnit=${cfg.measurementUnit}\n`;
+
+  const mUnit = getMeasurementUnit();
 
   const poseLines = poses.map((p, idx) => {
     let deg = p.h * 180 / Math.PI;
@@ -207,7 +209,7 @@ function buildExportArtifacts(poses, cfg) {
     const degStr = deg.toFixed(1);
     const comma = (idx < poses.length - 1) ? ',' : '';
     const lockTag = p.locked ? ' locked=true' : '';
-    return `    ${poseCtor(p.x.toFixed(3), p.y.toFixed(3), p.h.toFixed(6))}${comma}  // #${idx + 1}  x=${p.x.toFixed(3)}m, y=${p.y.toFixed(3)}m, θ=${degStr}°${lockTag}`;
+    return `    ${poseCtor(p.x.toFixed(3), p.y.toFixed(3), p.h.toFixed(6))}${comma}  // #${idx + 1}  x=${p.x.toFixed(3)}${mUnit}, y=${p.y.toFixed(3)}${mUnit}, θ=${degStr}°${lockTag}`;
   }).join('\n');
 
   const snippet = (cfg.kind === 'list')

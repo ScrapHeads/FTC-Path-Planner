@@ -48,8 +48,8 @@ async function importWaypointsFromText(text, filename) {
       if (els.headingWrap) els.headingWrap.checked = state.headingWrapHalf;
     }
     if (meta.fieldSize !== undefined) els.fieldSize.value = String(+meta.fieldSize);
-    if (meta.robotLenM !== undefined) els.robotLen.value = String(+meta.robotLenM);
-    if (meta.robotWidM !== undefined) els.robotWid.value = String(+meta.robotWidM);
+    if (meta.robotLen !== undefined) els.robotLen.value = String(+meta.robotLen);
+    if (meta.robotWid !== undefined) els.robotWid.value = String(+meta.robotWid);
     if (meta.measurementUnit !== undefined && els.measurementUnit) els.measurementUnit.value = meta.measurementUnit;
 
     if (Array.isArray(obj?.poses)) {
@@ -92,9 +92,9 @@ async function importWaypointsFromText(text, filename) {
           if (els.headingWrap) els.headingWrap.checked = state.headingWrapHalf;
         } else if (key === 'fieldsize') {
           els.fieldSize.value = String(+val);
-        } else if (key === 'robotlenin') {
-          els.robotLenIn.value = String(+val);
-        } else if (key === 'robotwidin') {
+        } else if (key === 'robotlen') {
+          els.robotLen.value = String(+val);
+        } else if (key === 'robotwid') {
           els.robotWidIn.value = String(+val);
         } else if (key === 'measurementunit' && els.measurementUnit) {
           els.measurementUnit.value = val;
@@ -149,19 +149,38 @@ async function importWaypointsFromText(text, filename) {
     };
 
     const wrap = getKV('headingWrapHalf');
-    const fin = getKV('fieldSize');
-    const rlen = getKV('robotLenIn');
-    const rwid = getKV('robotWidIn');
+    const fs = getKV('fieldSize');
+    const rlen = getKV('robotLen');
+    const rwid = getKV('robotWid');
     const munit = getKV('measurementUnit');
+    const pkgMatch = text.match(/package\s+([\w\.]+)\s*;/);
+    const classMatch = text.match(/class\s+(\w+)/);
+    const importMatch = text.match(/import\s+([\w\.]+Pose2d)/);
+    const arrayMatch = text.match(/public\s+static\s+final\s+Pose2d\[\]\s+PATH\s*=\s*new\s+Pose2d\[\]/);
+    const listMatch = text.match(/public\s+static\s+final\s+List<Pose2d>\s+PATH\s*=\s*Arrays\.asList|List<Pose2d>\s+path\s*=\s*Arrays\.asList/);
 
     if (wrap !== undefined) {
       state.headingWrapHalf = (wrap.toLowerCase() === 'true');
       if (els.headingWrap) els.headingWrap.checked = state.headingWrapHalf;
     }
-    if (fin !== undefined) els.fieldSize.value = String(+fin);
-    if (rlen !== undefined) els.robotLenIn.value = String(+rlen);
-    if (rwid !== undefined) els.robotWidIn.value = String(+rwid);
+    if (fs !== undefined) els.fieldSize.value = String(+fs);
+    if (rlen !== undefined) els.robotLen.value = String(+rlen);
+    if (rwid !== undefined) els.robotWid.value = String(+rwid);
     if (munit !== undefined && els.measurementUnit) els.measurementUnit.value = munit;
+    if (pkgMatch && els.packageName) els.packageName.value = pkgMatch[1];
+    if (classMatch && els.className) els.className.value = classMatch[1];
+    // Format detection: prefer explicit format, else detect by variable type
+    if (arrayMatch && els.exportKind) {
+      els.exportKind.value = 'array';
+    } else if (listMatch && els.exportKind) {
+      els.exportKind.value = 'list';
+    }
+    if (importMatch && els.javaType) {
+      const imp = importMatch[1];
+      if (imp.includes('acmerobotics')) els.javaType.value = 'rr';
+      else if (imp.includes('ftclib')) els.javaType.value = 'ftclib';
+      else if (imp.includes('RilLib')) els.javaType.value = 'RilLib';
+    }
 
     // ----------------------------------------
     // Pose2d line parser
