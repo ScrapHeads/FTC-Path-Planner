@@ -13,14 +13,14 @@ html, body {
 /* Two columns: fixed config width, canvas fills the rest */
 .app{
   display: grid;
-  grid-template-columns: 550px 1fr;  /* fixed config width */
+  grid-template-columns: 560px 1fr;  /* fixed config width */
   gap: 14px;
   height: 100vh;                     /* full viewport height */
 }
 
 .left{
   background: var(--panel);
-  padding: 14px;
+  padding: 17px;
   box-sizing: border-box;
   overflow-y: auto;                  /* left column scrolls */
   overflow-x: hidden;
@@ -71,6 +71,94 @@ code{
   font-family: ui-monospace, Menlo, Consolas, "Liberation Mono", monospace; /* optional: monospace */
 }
 
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--panel);       /* Scrollbar track color */
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--accent); /* Scrollbar thumb color */
+  border-radius: 10px;
+  border: 2px solid var(--panel);  /* Optional border for spacing */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--accent2); /* Hover effect */
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;                       /* "auto" or "thin" */
+  scrollbar-color: var(--accent) var(--panel); /* thumb, track */
+}
+
+/* Checkbox */
+.custom-checkbox-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 9px; /* Space between checkbox and label text */
+  grid-area: 9px;
+  cursor: pointer;
+}
+
+.hidden-checkbox {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.custom-checkbox-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-family: sans-serif;
+  color: var(--text);
+  gap: 9px;
+}
+
+.custom-checkbox-box {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--muted);
+  border-radius: 4px;
+  background-color: var(--bg);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: all 0.2s ease-in-out;
+}
+
+.custom-checkbox-box::after {
+  content: '';
+  width: 7px;
+  height: 7px;
+  background-color: var(--muted); /* Initial hidden state */
+  border-radius: 1px;
+  transform: scale(0);
+  transition: transform 0.2s ease-in-out, background-color 0.2s ease-in-out;
+}
+
+.hidden-checkbox:checked + .custom-checkbox-label .custom-checkbox-box {
+  border-color: var(--accent);
+  background-color: var(--accent);
+}
+
+.hidden-checkbox:checked + .custom-checkbox-label .custom-checkbox-box::after {
+  transform: scale(1);
+  background-color: #fff; /* Checkmark color */
+}
+
+.hidden-checkbox:focus + .custom-checkbox-label .custom-checkbox-box {
+  box-shadow: 0 0 0 1px var(--accent); /* Focus indicator */
+}
+
+
 /* UI bits */
 h1{font-size:18px;margin:0 0 10px 0}
 h2{font-size:14px;color:var(--muted);margin:18px 0 8px 0}
@@ -79,7 +167,7 @@ input,select,button,textarea{background:#0f141b;border:1px solid #243041;color:v
 button{cursor:pointer}
 .row{display:flex;gap:8px;align-items:center}
 .row>*, .grid-2>*{flex:1}
-.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
 .toolbar{display:flex;gap:8px;flex-wrap:wrap}
 .pill{background:#0f141b;border:1px solid #223041;border-radius:999px;padding:6px 10px;color:var(--muted);user-select:none}
 .list{max-height:240px;overflow:auto;border:1px solid #223041;border-radius:10px}

@@ -1,4 +1,4 @@
-import { els } from './els.js';
+import { els, getMeasurementUnit, toMeters } from './els.js';
 import { state } from './state.js';
 import { layout, pxToField } from './layout.js';
 import { normalize, sanitizeJavaIdent, sanitizeFileBase, mimeForName, wrapRadFull } from './utils.js';
@@ -89,9 +89,11 @@ async function writeIntoDirectory(dirHandle, filename, content) {
 }
 
 export function doExport() {
-  const fieldInches = parseFloat(els.fieldInches.value || '144');
-  const robotLenIn = parseFloat(els.robotLenIn.value || '18');
-  const robotWidIn = parseFloat(els.robotWidIn.value || '18');
+  const fieldSize = els.fieldSize.value || '144';
+  const robotLen = els.robotLen.value || '18';
+  const robotWid = els.robotWid.value || '18';
+  const measurementUnit = getMeasurementUnit();
+  console.log('Exporting with measurement unit:', measurementUnit);
 
   const poses = state.points.map((p, i) => {
     const { imgRect } = layout();
@@ -111,7 +113,8 @@ export function doExport() {
     fileType: els.exportFileType.value, // 'java-class' | 'java-snippet' | 'json' | 'csv'
     pkg: (els.packageName?.value || '').trim(),
     cls: (els.className?.value || 'AutoPath').trim(),
-    fieldInches, robotLenIn, robotWidIn
+    fieldSize, robotLen, robotWid,
+    measurementUnit
   };
 
   const { content, preview, suggestedName } = buildExportArtifacts(poses, cfg);
@@ -121,7 +124,7 @@ export function doExport() {
 }
 
 function getJavaExportConfig(lib) {
-  switch(lib) {
+  switch (lib) {
     case 'rr':
       return {
         imports: ['com.acmerobotics.roadrunner.geometry.Pose2d'],
@@ -159,9 +162,10 @@ function buildExportArtifacts(poses, cfg) {
         library: cfg.lib,
         format: cfg.kind,
         headingWrapHalf: !!state.headingWrapHalf,
-        fieldInches: +cfg.fieldInches,
-        robotLenIn: +cfg.robotLenIn,
-        robotWidIn: +cfg.robotWidIn
+        fieldSize: +cfg.fieldSize,
+        robotLen: +cfg.robotLen,
+        robotWid: +cfg.robotWid,
+        measurementUnit: cfg.measurementUnit
       },
       poses: poses.map(p => ({ x: +p.x, y: +p.y, headingRad: +p.h, locked: !!p.locked }))
     }, null, 2);
@@ -172,10 +176,11 @@ function buildExportArtifacts(poses, cfg) {
   if (cfg.fileType === 'csv') {
     const lines = [
       `# headingWrapHalf=${!!state.headingWrapHalf}`,
-      `# fieldInches=${+cfg.fieldInches}`,
-      `# robotLenIn=${+cfg.robotLenIn}`,
-      `# robotWidIn=${+cfg.robotWidIn}`,
-      'index,x_in,y_in,heading_rad,heading_deg,locked'
+      `# fieldSize=${+cfg.fieldSize}`,
+      `# robotLen=${+cfg.robotLen}`,
+      `# robotWid=${+cfg.robotWid}`,
+      `# measurementUnit=${cfg.measurementUnit}`,
+      'index,x_m,y_m,heading_rad,heading_deg,locked'
     ];
     poses.forEach((p, i) => {
       let deg = p.h * 180 / Math.PI;
@@ -185,7 +190,7 @@ function buildExportArtifacts(poses, cfg) {
         if (deg <= -180) deg += 360;
         if (deg > 180) deg -= 360;
       }
-      lines.push([i + 1, p.x.toFixed(2), p.y.toFixed(2), p.h.toFixed(6), deg.toFixed(3), p.locked ? 'true' : 'false'].join(','));
+      lines.push([i + 1, p.x.toFixed(3), p.y.toFixed(3), p.h.toFixed(6), deg.toFixed(3), p.locked ? 'true' : 'false'].join(','));
     });
     const csv = lines.join('\n');
     return { content: csv, preview: csv, suggestedName: `${fileBase}.csv` };
@@ -193,11 +198,9 @@ function buildExportArtifacts(poses, cfg) {
 
   // ---------- Java (snippet/class) ----------
   const headerComment =
-    `// headingWrapHalf=${!!state.headingWrapHalf}
-// fieldInches=${+cfg.fieldInches}
-// robotLenIn=${+cfg.robotLenIn}
-// robotWidIn=${+cfg.robotWidIn}
-`;
+    `// headingWrapHalf=${!!state.headingWrapHalf}\n// fieldSize=${+cfg.fieldSize}\n// robotLen=${+cfg.robotLen}\n// robotWid=${+cfg.robotWid}\n// measurementUnit=${cfg.measurementUnit}\n`;
+
+  const mUnit = getMeasurementUnit();
 
   const poseLines = poses.map((p, idx) => {
     let deg = p.h * 180 / Math.PI;
@@ -206,7 +209,7 @@ function buildExportArtifacts(poses, cfg) {
     const degStr = deg.toFixed(1);
     const comma = (idx < poses.length - 1) ? ',' : '';
     const lockTag = p.locked ? ' locked=true' : '';
-    return `    ${poseCtor(p.x.toFixed(2), p.y.toFixed(2), p.h.toFixed(6))}${comma}  // #${idx+1}  x=${p.x.toFixed(2)}in, y=${p.y.toFixed(2)}in, θ=${degStr}°${lockTag}`;
+    return `    ${poseCtor(p.x.toFixed(3), p.y.toFixed(3), p.h.toFixed(6))}${comma}  // #${idx + 1}  x=${p.x.toFixed(3)}${mUnit}, y=${p.y.toFixed(3)}${mUnit}, θ=${degStr}°${lockTag}`;
   }).join('\n');
 
   const snippet = (cfg.kind === 'list')

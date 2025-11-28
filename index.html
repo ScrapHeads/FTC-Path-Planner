@@ -3,59 +3,54 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>FTC Field Path Picker → Pose2d</title>
+  <title>FTC Field Path Planner</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <div class="app">
   <!-- LEFT: Config / Tools (scrolls independently) -->
   <div class="left">
-    <h1>FTC Field Path Picker</h1>
-    <div class="small">
-      Press <b>N</b> to add a waypoint at the cursor. Click a point to select. Drag point to move
-      (hold <b>Shift</b> to nudge by <b>0.5″</b>). Drag handle or use <b>Q/E</b> to rotate
-      (hold <b>Shift</b> for 15° snap). Output is in <b>radians</b> for Java.
-    </div>
+    <h1>FTC Path Planner</h1>
 
-    <h2>1) Field Image</h2>
+    <h2>1) Field</h2>
     <div class="grid-2">
       <div>
-        <label>Load image (PNG/JPG/SVG/WebP/BMP/GIF)</label>
+        <label>Load image (PNG/JPG/SVG/WebP/BMP)</label>
         <input id="imgInput" type="file" accept="image/*" />
-        <div class="small">Tip: SVG/WebP work too. Animated GIFs load the first frame.</div>
       </div>
       <div>
         <label>Sample image</label>
-        <select id="sampleSelect">
+        <select id="sampleSelect" >
           <option value="">— none —</option>
           <option value="ReferenceImages\into-the-deep.png">Roadrunner into the deep image</option>          
-          <option value="ReferenceImages\decode.webp">decode image</option>
+          <option value="ReferenceImages\decode.webp">Roadrunner decode image</option>
         </select>
       </div>
     </div>
 
     <div class="grid-2">
       <div>
-        <label>Field width (inches)</label>
-        <input id="fieldInches" type="number" value="144" />
+        <label>Field size (chosen unit)</label>
+        <input id="fieldSize" type="number" value="3.66" />
       </div>
       <div>
-        <label>Origin</label>
+        <label>Origin (0, 0)</label>
         <select id="originSelect">
-          <option value="center">Center (0,0 at field center)</option>
+          <option value="center">Center</option>
           <option value="bottomLeft">Bottom-left corner</option>
           <option value="topLeft">Top-left corner</option>
         </select>
       </div>
+      <div>
+        <label>Unit used</label>
+        <select id="measurementsUnit">
+          <option value="m">Meters</option>
+          <option value="cm">Centimeters</option>
+          <option value="ft">Feet</option>
+          <option value="in">Inches</option>
+        </select>
+      </div>
     </div>
-
-    <div class="row">
-      <label>
-        <input id="axesFtc" type="checkbox" checked />
-        <span id="axesText">Axes mode: <b>X+ forward</b>, <b>Y+ left</b></span>
-      </label>
-    </div>
-    <div class="small">Coordinates are computed in <b>inches</b>. Toggle switches coordinate axes.</div>
 
     <h2>2) Waypoints</h2>
     <div class="toolbar">
@@ -94,29 +89,52 @@
       </div>
     </div>
 
-    <!-- NEW: Heading loop toggle -->
+    <!-- Heading loop toggle -->
     <div class="row" style="margin-top:8px">
       <label class="row">
-        <input id="headingWrap" type="checkbox" />
-        <span>Wrap headings to <b>±180°</b> for display and <b>±π</b> on export</span>
+        <div class="custom-checkbox-wrapper">
+          <input type="checkbox" id="headingWrap" class="hidden-checkbox">
+          <label for="headingWrap"  class="custom-checkbox-label">
+            <span class="custom-checkbox-box"></span>
+            Wrap headings to <b>±180°</b> for display and <b>±π</b> on export
+          </label>
+        </div>
       </label>
     </div>
-    <div class="small">Off = show 0–360° and export radians in [0, 2π). On = show −180…+180° and export radians in (−π, +π].</div>
+    <div class="small">Off = show 0-360° and export radians in [0, 2π). On = show -180…+180° and export radians in (−π, +π].</div>
 
     <!-- Robot footprint (rectangle) -->
     <h2>Robot footprint</h2>
     <div class="grid-2">
       <div>
-        <label>Length (in)</label>
-        <input id="robotLenIn" type="number" step="0.5" value="18" />
+        <label>Length (Selected measurement)</label>
+        <input id="robotLen" type="number" step="0.5" value="0.4572" />
       </div>
       <div>
-        <label>Width (in)</label>
-        <input id="robotWidIn" type="number" step="0.5" value="18" />
+        <label>Width (Selected measurement)</label>
+        <input id="robotWid" type="number" step="0.5" value="0.4572" />
       </div>
     </div>
     <div class="row" style="margin-top:6px">
-      <label><input id="boxRotate" type="checkbox" checked /> Align with heading</label>
+
+      <label>
+        <input id="boxRotate" type="checkbox" class="hidden-checkbox" checked />
+        <label for="boxRotate" class="custom-checkbox-label">
+          <span class="custom-checkbox-box"></span>
+          Align with heading
+        </label>
+      </label>
+    </div>
+
+    <div class="row">
+      <label>
+        <div class="custom-checkbox-wrapper"></div>
+          <input id="axesFtc" type="checkbox" class="hidden-checkbox" checked />
+          <label for="axesFtc" class="custom-checkbox-label">
+            <span class="custom-checkbox-box"></span>
+            Axes toggle: <b>X+ forward,</b> <b>Y+ left</b>
+          </label>     
+      </label>
     </div>
 
     <div class="list" style="margin-top:8px">
@@ -181,14 +199,14 @@
     <div class="small" style="margin-top:6px">
       Tip: use “Choose folder…” and select your repo directory, e.g.
       <code>TeamCode/src/main/java/org/firstinspires/ftc/teamcode/auto/paths</code>,
-      then “Save to file…” writes directly there (Chrome/Edge).
+      then “Save to file…” writes directly there.
     </div>
   </div>
 
   <!-- RIGHT: Canvas (stays fixed; no scroll) -->
   <div class="right">
     <div class="row">
-      <span class="pill">N: add point @ cursor</span>
+      <span class="pill">N: add point at cursor</span>
       <span class="pill">Click point: select</span>
       <span class="pill">Drag point: move (Shift=0.5″)</span>
       <span class="pill">Drag handle / Q,E: rotate (Shift=15°)</span>

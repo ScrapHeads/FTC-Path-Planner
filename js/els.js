@@ -7,7 +7,8 @@ export const els = {
   // Image + config
   imgInput: document.getElementById('imgInput'),
   sampleSelect: document.getElementById('sampleSelect'),
-  fieldInches: document.getElementById('fieldInches'),
+  fieldSize: document.getElementById('fieldSize'),
+  measurementUnit: document.getElementById('measurementsUnit'),
   originSelect: document.getElementById('originSelect'),
   axesFtc: document.getElementById('axesFtc'),
   axesText: document.getElementById('axesText'),
@@ -44,8 +45,8 @@ export const els = {
 
   // Canvas + footprint
   dropZone: document.getElementById('dropZone'),
-  robotLenIn: document.getElementById('robotLenIn'),
-  robotWidIn: document.getElementById('robotWidIn'),
+  robotLen: document.getElementById('robotLen'),
+  robotWid: document.getElementById('robotWid'),
   boxRotate: document.getElementById('boxRotate'),
 };
 
@@ -54,12 +55,34 @@ export function isFtc(){ return !!els.axesFtc?.checked; }
 export function updateAxesUI(){
   if(!els.axesText || !els.thX || !els.thY) return;
   if(isFtc()){
-    els.axesText.innerHTML = 'Axes mode: <b>X+ forward</b>, <b>Y+ left</b>';
+    els.axesText.innerHTML = 'Axes toggle: <b>X+ forward</b>, <b>Y+ left</b>';
     els.thX.textContent = 'X fwd (+)';
     els.thY.textContent = 'Y left (+)';
   } else {
-    els.axesText.innerHTML = 'Axes mode: <b>X+ right</b>, <b>Y+ down</b>';
+    els.axesText.innerHTML = 'Axes toggle: <b>X+ right</b>, <b>Y+ down</b>';
     els.thX.textContent = 'X right (+)';
     els.thY.textContent = 'Y down (+)';
   }
+}
+
+export function getMeasurementUnit() {
+  // Returns the selected measurement unit (e.g., 'm', 'cm', 'in')
+  return els.measurementUnit.value;
+}
+
+export function toMeters(value) {
+  // Converts a value from the selected unit to meters
+  const unit = getMeasurementUnit();
+  if (unit === 'cm') return value / 100;
+  if (unit === 'ft') return value * 3.28084;
+  if (unit === 'in') return value * 0.0254;
+  return value; // already meters
+}
+
+export function fromMeters(value, targetUnit) {
+  // Converts a value in meters to the target unit
+  if (targetUnit === 'cm') return value * 100;
+  if (targetUnit === 'ft') return value * 3.28084;
+  if (targetUnit === 'in') return value / 0.0254;
+  return value; // already meters
 }
