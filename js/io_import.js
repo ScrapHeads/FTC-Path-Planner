@@ -204,7 +204,8 @@ async function importWaypointsFromText(text, filename) {
 
       // Parse rotation (either numeric or new Rotation2d(...))
       let h = 0;
-      const rotMatch = rotStr?.match(/new\s+Rotation2d\s*\(\s*([-+]?\d*\.?\d+)\s*\)/);
+      const rotMatch = rotStr?.match(/new\s*Rotation2d\s*\(\s*([-+]?\d*\.?\d+)\s*\)?/);
+      
       if (rotMatch) {
         h = parseFloat(rotMatch[1]);
       } else if (rotStr) {

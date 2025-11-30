@@ -4,6 +4,10 @@ This tool provides a browser-based interface for creating and managing robot pat
 
 ---
 
+## GitHub Site
+This project is also hosted on GitHub Pages at the following link:  
+https://scrapheads.github.io/FTC-Path-Planner/
+
 ## Features
 
 ### Core
