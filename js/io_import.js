@@ -4,6 +4,7 @@ import { fieldToImagePx } from './layout.js';
 import { updateTable, syncSelectedUI } from './ui.js';
 import { draw } from './draw.js';
 import { pushHistory } from './state.js';
+import { doExport } from './io_export.js';
 
 export function initImport() {
   els.loadBtn.addEventListener('click', () => {
@@ -38,6 +39,7 @@ async function importWaypointsFromText(text, filename) {
 
   // -------- JSON --------
   if (ext === 'json' || lower.trim().startsWith('{')) {
+    els.exportFileType.value = 'json';
     const obj = JSON.parse(text);
 
     // Metadata: read from meta{} (preferred) or top-level fallback
@@ -76,6 +78,7 @@ async function importWaypointsFromText(text, filename) {
 
   // -------- CSV --------
   if (ext === 'csv') {
+    els.exportFileType.value = 'csv';
     const rawLines = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
     if (!rawLines.length) throw new Error('CSV is empty.');
 
@@ -95,7 +98,7 @@ async function importWaypointsFromText(text, filename) {
         } else if (key === 'robotlen') {
           els.robotLen.value = String(+val);
         } else if (key === 'robotwid') {
-          els.robotWidIn.value = String(+val);
+          els.robotWid.value = String(+val);
         } else if (key === 'measurementunit' && els.measurementUnit) {
           els.measurementUnit.value = val;
         }
@@ -140,6 +143,7 @@ async function importWaypointsFromText(text, filename) {
 
   // -------- Java / TXT --------
   if (ext === 'java' || ext === 'txt' || lower.includes('pose2d')) {
+    els.exportFileType.value = ext === 'java' ? 'java-class' : 'java-snippet';
     // ---------------------------
     // Header metadata extraction
     // ---------------------------
@@ -238,4 +242,6 @@ function loadPosesIntoPoints(poses) {
     const ip = fieldToImagePx(p.x, p.y);
     return { xPx: ip.x, yPx: ip.y, headingRad: +p.h || 0, locked: !!p.locked };
   });
+  console.log('Imported poses:', poses);
+  doExport();
 }
