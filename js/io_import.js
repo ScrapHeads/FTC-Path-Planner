@@ -5,6 +5,7 @@ import { updateTable, syncSelectedUI } from './ui.js';
 import { draw } from './draw.js';
 import { pushHistory } from './state.js';
 import { doExport } from './io_export.js';
+import { loadImage } from './io_image.js';
 
 export function initImport() {
   els.loadBtn.addEventListener('click', () => {
@@ -18,6 +19,7 @@ export function initImport() {
       try {
         pushHistory();
         await importWaypointsFromText(text, name);
+        loadImage(els.sampleSelect.value || '', false); // reload current image
         state.selected = state.points.length ? 0 : -1;
         syncSelectedUI(); updateTable(); draw();
       } catch (err) {
@@ -53,6 +55,7 @@ async function importWaypointsFromText(text, filename) {
     if (meta.robotLen !== undefined) els.robotLen.value = String(+meta.robotLen);
     if (meta.robotWid !== undefined) els.robotWid.value = String(+meta.robotWid);
     if (meta.measurementUnit !== undefined && els.measurementUnit) els.measurementUnit.value = meta.measurementUnit;
+    if (meta.presetField !== undefined && els.sampleSelect) els.sampleSelect.value = meta.presetField;
 
     if (Array.isArray(obj?.poses)) {
       // poses with headingRad and optional locked
@@ -101,6 +104,8 @@ async function importWaypointsFromText(text, filename) {
           els.robotWid.value = String(+val);
         } else if (key === 'measurementunit' && els.measurementUnit) {
           els.measurementUnit.value = val;
+        } else if (key === 'presetfield' && els.sampleSelect) {
+          els.sampleSelect.value = val;
         }
       }
       i++;
@@ -157,6 +162,7 @@ async function importWaypointsFromText(text, filename) {
     const rlen = getKV('robotLen');
     const rwid = getKV('robotWid');
     const munit = getKV('measurementUnit');
+    const pfield = getKV('presetField');
     const pkgMatch = text.match(/package\s+([\w\.]+)\s*;/);
     const classMatch = text.match(/class\s+(\w+)/);
     const importMatch = text.match(/import\s+([\w\.]+Pose2d)/);
@@ -167,6 +173,8 @@ async function importWaypointsFromText(text, filename) {
       state.headingWrapHalf = (wrap.toLowerCase() === 'true');
       if (els.headingWrap) els.headingWrap.checked = state.headingWrapHalf;
     }
+    console.log('pfield: ', pfield);
+    if (pfield !== undefined && els.sampleSelect) els.sampleSelect.value = pfield;
     if (fs !== undefined) els.fieldSize.value = String(+fs);
     if (rlen !== undefined) els.robotLen.value = String(+rlen);
     if (rwid !== undefined) els.robotWid.value = String(+rwid);
@@ -209,7 +217,7 @@ async function importWaypointsFromText(text, filename) {
       // Parse rotation (either numeric or new Rotation2d(...))
       let h = 0;
       const rotMatch = rotStr?.match(/new\s*Rotation2d\s*\(\s*([-+]?\d*\.?\d+)\s*\)?/);
-      
+
       if (rotMatch) {
         h = parseFloat(rotMatch[1]);
       } else if (rotStr) {

@@ -89,9 +89,9 @@ async function writeIntoDirectory(dirHandle, filename, content) {
 }
 
 export function doExport() {
-  const fieldSize = els.fieldSize.value || '144';
-  const robotLen = els.robotLen.value || '18';
-  const robotWid = els.robotWid.value || '18';
+  const fieldSize = els.fieldSize.value || '3.66';
+  const robotLen = els.robotLen.value || '0.4572';
+  const robotWid = els.robotWid.value || '0.4572';
   const measurementUnit = getMeasurementUnit();
   console.log('Exporting with measurement unit:', measurementUnit);
 
@@ -114,7 +114,8 @@ export function doExport() {
     pkg: (els.packageName?.value || '').trim(),
     cls: (els.className?.value || 'AutoPath').trim(),
     fieldSize, robotLen, robotWid,
-    measurementUnit
+    measurementUnit,
+    presetField: els.sampleSelect?.value || 'None'
   };
 
   const { content, preview, suggestedName } = buildExportArtifacts(poses, cfg);
@@ -165,7 +166,8 @@ function buildExportArtifacts(poses, cfg) {
         fieldSize: +cfg.fieldSize,
         robotLen: +cfg.robotLen,
         robotWid: +cfg.robotWid,
-        measurementUnit: cfg.measurementUnit
+        measurementUnit: cfg.measurementUnit,
+        presetField: cfg.presetField
       },
       poses: poses.map(p => ({ x: +p.x, y: +p.y, headingRad: +p.h, locked: !!p.locked }))
     }, null, 2);
@@ -180,7 +182,8 @@ function buildExportArtifacts(poses, cfg) {
       `# robotLen=${+cfg.robotLen}`,
       `# robotWid=${+cfg.robotWid}`,
       `# measurementUnit=${cfg.measurementUnit}`,
-      'index,x_m,y_m,heading_rad,heading_deg,locked'
+      `# presetField=${cfg.presetField}`,
+      'index,x,y,heading_rad,heading_deg,locked'
     ];
     poses.forEach((p, i) => {
       let deg = p.h * 180 / Math.PI;
@@ -198,7 +201,12 @@ function buildExportArtifacts(poses, cfg) {
 
   // ---------- Java (snippet/class) ----------
   const headerComment =
-    `// headingWrapHalf=${!!state.headingWrapHalf}\n// fieldSize=${+cfg.fieldSize}\n// robotLen=${+cfg.robotLen}\n// robotWid=${+cfg.robotWid}\n// measurementUnit=${cfg.measurementUnit}\n`;
+    '// headingWrapHalf=' + !!state.headingWrapHalf + '\n'
+    + '// fieldSize=' + (+cfg.fieldSize) + '\n'
+    + '// robotLen=' + (+cfg.robotLen) + '\n'
+    + '// robotWid=' + (+cfg.robotWid) + '\n'
+    + '// measurementUnit=' + cfg.measurementUnit + '\n'
+    + '// presetField=' + cfg.presetField + '\n';
 
   const mUnit = getMeasurementUnit();
 
