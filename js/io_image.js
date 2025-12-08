@@ -23,7 +23,7 @@ export function initImageIO(){
   ['dragover','drop'].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); }));
 }
 
-function loadImage(url, remote){
+export function loadImage(url, remote){
   state.img = new Image();
   if(remote) state.img.crossOrigin = 'anonymous';
   state.img.onload = ()=>{ state.imgLoaded = true; setCanvasSize(); draw(); };

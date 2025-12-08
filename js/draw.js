@@ -1,53 +1,53 @@
-import { ctx, dpi, els, getMeasurementUnit} from './els.js';
+import { ctx, dpi, els, getMeasurementUnit } from './els.js';
 import { state, getVisibleWaypointCount } from './state.js';
 import { layout, pxPerFieldSize, pxToField } from './layout.js';
 
-export function draw(){
-  try{
-    const {imgRect} = layout();
-    ctx.setTransform(1,0,0,1,0,0);
-    ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
+export function draw() {
+  try {
+    const { imgRect } = layout();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
     drawGrid();
 
-    if(state.imgLoaded){
+    if (state.imgLoaded) {
       ctx.drawImage(state.img, imgRect.x, imgRect.y, imgRect.w, imgRect.h);
     } else {
       ctx.fillStyle = '#101820';
       ctx.fillRect(imgRect.x, imgRect.y, imgRect.w, imgRect.h);
       ctx.fillStyle = '#789';
-      ctx.font = `${14*dpi}px sans-serif`;
-      ctx.fillText('Load a field image', imgRect.x+16, imgRect.y+28);
+      ctx.font = `${14 * dpi}px sans-serif`;
+      ctx.fillText('Load a field image', imgRect.x + 16, imgRect.y + 28);
     }
 
     drawPoints();
     drawMeasurement();
     drawHoverLabel();
     if (state.hudVisible) drawHUD();
-  }catch(err){
+  } catch (err) {
     console.error(err);
     alert('Render error: ' + err.message);
   }
 }
 
-function drawGrid(){
+function drawGrid() {
   const step = 40 * dpi;
   ctx.save();
   ctx.fillStyle = '#172231';
-  for(let y=step/2; y<ctx.canvas.height; y+=step){
-    for(let x=step/2; x<ctx.canvas.width; x+=step){
+  for (let y = step / 2; y < ctx.canvas.height; y += step) {
+    for (let x = step / 2; x < ctx.canvas.width; x += step) {
       ctx.fillRect(x, y, 1, 1);
     }
   }
   ctx.restore();
 }
 
-function drawPoints(){
-  if(!state.imgLoaded) return;
+function drawPoints() {
+  if (!state.imgLoaded) return;
   const R = 6 * dpi;
   const handleLen = 28 * dpi;
   const ppi = pxPerFieldSize();
-  const {imgRect, imgToCanvas} = layout();
+  const { imgRect, imgToCanvas } = layout();
 
   const lenIn = Math.max(0, parseFloat(els.robotLen.value || '0.4572'));
   const widIn = Math.max(0, parseFloat(els.robotWid.value || '0.4572'));
@@ -57,28 +57,28 @@ function drawPoints(){
   const visibleCount = getVisibleWaypointCount();
 
   // visible segments
-  for (let i = 1; i < visibleCount; i++){
-    const a = state.points[i-1], b = state.points[i];
+  for (let i = 1; i < visibleCount; i++) {
+    const a = state.points[i - 1], b = state.points[i];
     const ax = imgRect.x + a.xPx * (imgRect.w / state.img.width);
     const ay = imgRect.y + a.yPx * (imgRect.h / state.img.height);
     const bx = imgRect.x + b.xPx * (imgRect.w / state.img.width);
     const by = imgRect.y + b.yPx * (imgRect.h / state.img.height);
-    ctx.strokeStyle = i===state.selected ? '#cbd5e1' : '#7dd3fc';
+    ctx.strokeStyle = i === state.selected ? '#cbd5e1' : '#7dd3fc';
     ctx.lineWidth = 2 * dpi;
     ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
   }
 
   // future segments dashed (preview)
-  if (state.previewEnabled && state.dimFuture && visibleCount >= 1 && state.points.length > visibleCount){
+  if (state.previewEnabled && state.dimFuture && visibleCount >= 1 && state.points.length > visibleCount) {
     const start = state.points[visibleCount - 1];
     let sx = imgRect.x + start.xPx * (imgRect.w / state.img.width);
     let sy = imgRect.y + start.yPx * (imgRect.h / state.img.height);
     ctx.save();
-    ctx.setLineDash([6,6]);
+    ctx.setLineDash([6, 6]);
     ctx.strokeStyle = 'rgba(0,0,0,0.28)';
     ctx.lineWidth = 2 * dpi;
     ctx.beginPath(); ctx.moveTo(sx, sy);
-    for (let i = visibleCount; i < state.points.length; i++){
+    for (let i = visibleCount; i < state.points.length; i++) {
       const p = state.points[i];
       const px = imgRect.x + p.xPx * (imgRect.w / state.img.width);
       const py = imgRect.y + p.yPx * (imgRect.h / state.img.height);
@@ -89,7 +89,7 @@ function drawPoints(){
   }
 
   // points
-  state.points.forEach((p, i)=>{
+  state.points.forEach((p, i) => {
     const cx = imgRect.x + p.xPx * (imgRect.w / state.img.width);
     const cy = imgRect.y + p.yPx * (imgRect.h / state.img.height);
 
@@ -99,24 +99,24 @@ function drawPoints(){
 
     // Field 0 = North, CCW positive → Canvas angle is clockwise (y-down)
     // angCanvas = -(θ_field + π/2)
-    const angCanvas = -(p.headingRad + Math.PI/2);
+    const angCanvas = -(p.headingRad + Math.PI / 2);
 
     // robot footprint for visible points only
-    if(!isFuture && lenPxCanvas>0 && widPxCanvas>0){
+    if (!isFuture && lenPxCanvas > 0 && widPxCanvas > 0) {
       ctx.save();
       ctx.translate(cx, cy);
       const angle = els.boxRotate.checked ? angCanvas : 0;
       ctx.rotate(angle);
       ctx.globalAlpha = 0.12; ctx.fillStyle = isLocked ? '#f59e0b' : '#22c55e';
-      ctx.fillRect(-widPxCanvas/2, -lenPxCanvas/2, widPxCanvas, lenPxCanvas);
+      ctx.fillRect(-widPxCanvas / 2, -lenPxCanvas / 2, widPxCanvas, lenPxCanvas);
       ctx.globalAlpha = 1; ctx.lineWidth = 2 * dpi; ctx.strokeStyle = isLocked ? '#f59e0b' : '#22c55e';
-      ctx.strokeRect(-widPxCanvas/2, -lenPxCanvas/2, widPxCanvas, lenPxCanvas);
+      ctx.strokeRect(-widPxCanvas / 2, -lenPxCanvas / 2, widPxCanvas, lenPxCanvas);
       ctx.restore();
     }
 
     // point dot
-    ctx.fillStyle = isFuture ? 'rgba(226,232,240,0.35)' : (isSel? '#a78bfa' : '#e2e8f0');
-    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = isFuture ? 'rgba(226,232,240,0.35)' : (isSel ? '#a78bfa' : '#e2e8f0');
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
     ctx.lineWidth = 2 * dpi;
     ctx.strokeStyle = isLocked ? '#f59e0b' : (isFuture ? 'rgba(148,163,184,0.35)' : '#94a3b8');
     ctx.stroke();
@@ -125,38 +125,38 @@ function drawPoints(){
     const hx = cx + Math.cos(angCanvas) * handleLen;
     const hy = cy + Math.sin(angCanvas) * handleLen;
     ctx.save();
-    if (isLocked) ctx.setLineDash([6,4]);
+    if (isLocked) ctx.setLineDash([6, 4]);
     ctx.strokeStyle = isFuture ? 'rgba(148,163,184,0.35)' : (isLocked ? '#f59e0b' : '#94a3b8');
     ctx.lineWidth = 2 * dpi;
     ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(hx, hy); ctx.stroke();
     ctx.restore();
 
-    if(!isFuture){
+    if (!isFuture) {
       drawArrow(hx, hy, angCanvas, isLocked ? '#f59e0b' : '#94a3b8');
     }
 
     // label
     ctx.fillStyle = isFuture ? 'rgba(11,15,20,0.6)' : '#0b0f14';
-    ctx.font = `${12*dpi}px sans-serif`;
-    const label = isLocked ? `🔒 ${i+1}` : String(i+1);
-    ctx.fillText(label, cx + 8*dpi, cy - 8*dpi);
+    ctx.font = `${12 * dpi}px sans-serif`;
+    const label = isLocked ? `🔒 ${i + 1}` : String(i + 1);
+    ctx.fillText(label, cx + 8 * dpi, cy - 8 * dpi);
   });
 }
 
-function drawArrow(x,y,theta,color){
+function drawArrow(x, y, theta, color) {
   const s = 8 * dpi;
-  ctx.save(); ctx.translate(x,y); ctx.rotate(theta);
-  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(-s,-s/2); ctx.lineTo(-s,s/2);
+  ctx.save(); ctx.translate(x, y); ctx.rotate(theta);
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-s, -s / 2); ctx.lineTo(-s, s / 2);
   ctx.closePath(); ctx.fillStyle = color; ctx.fill(); ctx.restore();
 }
 
-function drawMeasurement(){
+function drawMeasurement() {
   if (!state.measureActive) return;
   const a = state.measureStart, b = state.measureEnd;
   ctx.save();
-  ctx.lineWidth = 2*dpi;
+  ctx.lineWidth = 2 * dpi;
   ctx.strokeStyle = '#60a5fa';
-  ctx.setLineDash([4,4]);
+  ctx.setLineDash([4, 4]);
   ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
   ctx.setLineDash([]);
 
@@ -168,7 +168,7 @@ function drawMeasurement(){
   const angRad = Math.atan2(dy, dx);
 
   let angDeg;
-  if (state.headingWrapHalf){
+  if (state.headingWrapHalf) {
     let d = angRad * 180 / Math.PI;
     if (d <= -180) d += 360;
     if (d > 180) d -= 360;
@@ -179,47 +179,47 @@ function drawMeasurement(){
     angDeg = d;
   }
 
-  const pad = 6*dpi;
+  const pad = 6 * dpi;
   const text = `${dist.toFixed(2)} in • ${angDeg.toFixed(1)}°`;
-  ctx.font = `${12*dpi}px sans-serif`;
+  ctx.font = `${12 * dpi}px sans-serif`;
   const tw = ctx.measureText(text).width;
   const midx = b.x;
-  const midy = b.y - 18*dpi;
+  const midy = b.y - 18 * dpi;
   ctx.fillStyle = 'rgba(2,6,14,0.85)';
-  ctx.fillRect(midx - tw/2 - pad, midy - 12*dpi, tw + 2*pad, 18*dpi);
+  ctx.fillRect(midx - tw / 2 - pad, midy - 12 * dpi, tw + 2 * pad, 18 * dpi);
   ctx.fillStyle = '#e2e8f0';
-  ctx.fillText(text, midx - tw/2, midy + 2*dpi);
+  ctx.fillText(text, midx - tw / 2, midy + 2 * dpi);
   ctx.restore();
 }
 
-function drawHoverLabel(){
+function drawHoverLabel() {
   if (state.measureActive) return;
   if (!state.hoverActive || !state.imgLoaded) return;
 
   const { imgRect } = layout();
   const m = state.hoverPos;
-  const within = m.x>=imgRect.x && m.x<=imgRect.x+imgRect.w && m.y>=imgRect.y && m.y<=imgRect.y+imgRect.h;
+  const within = m.x >= imgRect.x && m.x <= imgRect.x + imgRect.w && m.y >= imgRect.y && m.y <= imgRect.y + imgRect.h;
   if (!within) return;
 
   const f = pxToField(m.x, m.y);
   const text = `X ${f.x.toFixed(2)}  Y ${f.y.toFixed(2)} ${getMeasurementUnit()}`;
 
   ctx.save();
-  ctx.font = `${12*dpi}px sans-serif`;
-  const pad = 6*dpi;
+  ctx.font = `${12 * dpi}px sans-serif`;
+  const pad = 6 * dpi;
   const tw = ctx.measureText(text).width;
   const bx = m.x;
-  const by = m.y - 22*dpi;
+  const by = m.y - 22 * dpi;
 
   ctx.fillStyle = 'rgba(2,6,14,0.85)';
-  ctx.fillRect(bx - tw/2 - pad, by - 12*dpi, tw + 2*pad, 20*dpi);
+  ctx.fillRect(bx - tw / 2 - pad, by - 12 * dpi, tw + 2 * pad, 20 * dpi);
 
   ctx.fillStyle = '#e2e8f0';
-  ctx.fillText(text, bx - tw/2, by + 3*dpi);
+  ctx.fillText(text, bx - tw / 2, by + 3 * dpi);
   ctx.restore();
 }
 
-function drawHUD(){
+function drawHUD() {
   const lines = [
     'N: Add point at cursor',
     'Q/E: Rotate selected (Shift=15° / Alt=5°)',
@@ -229,19 +229,19 @@ function drawHUD(){
     'M (hold): Measure (1in, Shift=0.5in)',
     'H: Toggle this HUD'
   ];
-  const pad = 8*dpi;
-  const lineH = 16*dpi;
-  const w = 340*dpi, h = (lines.length*lineH) + pad*2;
-  const x = ctx.canvas.width - w - 12*dpi;
-  const y = ctx.canvas.height - h - 12*dpi;
+  const pad = 8 * dpi;
+  const lineH = 16 * dpi;
+  const w = 340 * dpi, h = (lines.length * lineH) + pad * 2;
+  const x = ctx.canvas.width - w - 12 * dpi;
+  const y = ctx.canvas.height - h - 12 * dpi;
 
   ctx.save();
   ctx.fillStyle = 'rgba(2,6,14,0.85)';
   ctx.fillRect(x, y, w, h);
   ctx.fillStyle = '#e2e8f0';
-  ctx.font = `${12*dpi}px sans-serif`;
-  lines.forEach((t, i)=>{
-    ctx.fillText(t, x + pad, y + pad + (i+1)*lineH - 6*dpi);
+  ctx.font = `${12 * dpi}px sans-serif`;
+  lines.forEach((t, i) => {
+    ctx.fillText(t, x + pad, y + pad + (i + 1) * lineH - 6 * dpi);
   });
   ctx.restore();
 }
