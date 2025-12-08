@@ -32,43 +32,8 @@ export function initImport() {
 }
 
 async function importWaypointsFromText(text, filename) {
-  // Check if image is loaded, or if a preset field is available in the import
   if (!state.imgLoaded) {
-    // Try to extract presetField from JSON, CSV, Java, or TXT metadata
-    let presetField;
-    try {
-      if (filename.endsWith('.json') || text.trim().startsWith('{')) {
-        const obj = JSON.parse(text);
-        presetField = obj?.meta?.presetField || obj?.presetField;
-      } else if (filename.endsWith('.csv')) {
-        const rawLines = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-        for (const line of rawLines) {
-          if (line.startsWith('#')) {
-            const kv = /#\s*presetfield\s*=\s*([^\s#]+)/i.exec(line);
-            if (kv) {
-              presetField = kv[1];
-              break;
-            }
-          }
-        }
-      } else if (filename.endsWith('.java') || filename.endsWith('.txt')) {
-        // Look for presetField in Java/TXT comments
-        const match = text.match(/presetField\s*=\s*([^\n\r]+)/i);
-        if (match) {
-          presetField = match[1].trim();
-        }
-      }
-    } catch (e) {
-      // Ignore parse errors here
-    }
-
-    // If presetField found and not null/None, load it and continue
-    if (presetField && presetField.toLowerCase() !== 'null' && presetField.toLowerCase() !== 'none') {
-      if (els.sampleSelect) els.sampleSelect.value = presetField;
-      await loadImage(els.sampleSelect.value || '', false);
-    } else {
-      throw new Error('Load a field image first or provide a valid presetField in the import.');
-    }
+    throw new Error('Load a field image first so points can be placed correctly.');
   }
 
   const ext = filename.split('.').pop();
