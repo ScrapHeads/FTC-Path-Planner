@@ -14,8 +14,9 @@ export function initInteractions() {
   canvas.addEventListener('mousedown', e => {
     const m = mousePos(e); state.lastMouse = m;
     const hit = hitTest(m.x, m.y);
+    const path = state.paths[state.activePath];
     if (hit && hit.type === 'point') {
-      if (state.points[hit.index].locked) {
+      if (path.points[hit.index].locked) {
         state.selected = hit.index;
         state.dragMode = null;
         syncSelectedUI(); draw();
@@ -24,6 +25,7 @@ export function initInteractions() {
         state.selected = hit.index;
         syncSelectedUI(); draw();
         state.dragMode = hit.handle ? 'rotate' : 'move';
+        console.log("Drag mode set to:", state.dragMode);
       }
     } else {
       state.dragMode = null;
@@ -33,8 +35,6 @@ export function initInteractions() {
   // Mouse move: move/rotate if not locked; measure overlay; hover label timer
   window.addEventListener('mousemove', e => {
     const m = mousePos(e); state.lastMouse = m;
-
-    // Hover label: restart idle timer
     handleHoverIdle(m);
 
     // Measure tool: update with snapping
@@ -48,8 +48,9 @@ export function initInteractions() {
       return;
     }
 
-    if (state.selected < 0 || state.dragMode === null) return;
-    if (state.points[state.selected].locked) return;
+    const path = state.paths[state.activePath];
+    if (path.selected < 0 || path.dragMode === null) return;
+    if (path.locked) return;
 
     if (state.dragMode === 'move') {
       const imgPt = canvasToImagePx(m.x, m.y);
@@ -62,16 +63,16 @@ export function initInteractions() {
         const Xs = Math.round(f.x / 0.5) * 0.5;
         const Ys = Math.round(f.y / 0.5) * 0.5;
         const ip = fieldToImagePx(Xs, Ys);
-        state.points[state.selected].xPx = ip.x;
-        state.points[state.selected].yPx = ip.y;
+        path.points[state.selected].xPx = ip.x;
+        path.points[state.selected].yPx = ip.y;
       } else {
-        state.points[state.selected].xPx = imgPt.x;
-        state.points[state.selected].yPx = imgPt.y;
+        path.points[state.selected].xPx = imgPt.x;
+        path.points[state.selected].yPx = imgPt.y;
       }
       syncSelectedUI(); updateTable(); draw();
     } else if (state.dragMode === 'rotate') {
       const { imgRect } = layout();
-      const p = state.points[state.selected];
+      const p = path.points[state.selected];
       const cx = imgRect.x + p.xPx * (imgRect.w / state.img.width);
       const cy = imgRect.y + p.yPx * (imgRect.h / state.img.height);
 
@@ -86,8 +87,8 @@ export function initInteractions() {
       const snap = e.shiftKey ? (15 * Math.PI / 180) : (e.altKey ? 5 * Math.PI / 180 : 0);
       if (snap) angField = Math.round(angField / snap) * snap;
 
-      state.points[state.selected].headingRad = normalize(angField);
-      els.headingDeg.value = formatDegForUI(state.points[state.selected].headingRad).toFixed(1);
+      path.points[path.selected].headingRad = normalize(angField);
+      els.headingDeg.value = formatDegForUI(path.points[path.selected].headingRad).toFixed(1);
       updateTable(); draw();
     }
   });
@@ -104,6 +105,8 @@ export function initInteractions() {
   window.addEventListener('keydown', e => {
     const tag = (document.activeElement && document.activeElement.tagName) || '';
     const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+
+    const path = state.paths[state.activePath];
 
     // Measure start (hold M)
     if (!typing && (e.key === 'm' || e.key === 'M') && !state.measureActive) {
@@ -122,12 +125,12 @@ export function initInteractions() {
         e.preventDefault();
         if (state.selected >= 0) {
           pushHistory();
-          const src = state.points[state.selected];
+          const src = path.points[path.selected];
           const dup = { xPx: src.xPx, yPx: src.yPx, headingRad: src.headingRad, locked: false };
-          state.points.splice(state.selected + 1, 0, dup);
-          state.selected = state.selected + 1;
-          if (state.previewEnabled && state.previewIndex === state.points.length - 2) {
-            state.previewIndex = state.points.length - 1;
+          path.points.splice(path.selected + 1, 0, dup);
+          path.selected = path.selected + 1;
+          if (state.previewEnabled && state.previewIndex === path.points.length - 2) {
+            state.previewIndex = path.points.length - 1;
           }
           syncSelectedUI(); updateTable(); draw();
         }
@@ -141,20 +144,20 @@ export function initInteractions() {
     }
 
     if (!typing && (e.key === 'Delete')) {
-      if (state.selected >= 0) {
+      if (path.selected >= 0) {
         pushHistory();
-        state.points.splice(state.selected, 1);
-        state.selected = Math.min(state.selected, state.points.length - 1);
-        if (state.previewEnabled && state.previewIndex > state.points.length - 1) {
-          state.previewIndex = state.points.length - 1;
+        path.points.splice(path.selected, 1);
+        path.selected = Math.min(path.selected, path.points.length - 1);
+        if (state.previewEnabled && state.previewIndex > path.points.length - 1) {
+          state.previewIndex = path.points.length - 1;
         }
         syncSelectedUI(); updateTable(); draw();
       }
     }
 
     // Q/E rotation: Q = CCW (+), E = CW (−)
-    if (state.selected >= 0 && (e.key.toLowerCase() === 'q' || e.key.toLowerCase() === 'e') && !typing) {
-      if (state.points[state.selected].locked) return;
+    if (path.selected >= 0 && (e.key.toLowerCase() === 'q' || e.key.toLowerCase() === 'e') && !typing) {
+      if (path.points[path.selected].locked) return;
       const dir = e.key.toLowerCase() === 'q' ? +1 : -1;
       const base = e.shiftKey ? 15 : 5;
       const step = base * Math.PI / 180;
@@ -173,7 +176,7 @@ export function initInteractions() {
         stepPreview(-1); draw();
       } else if (e.key === '\\') {
         setPreviewEnabled(true);
-        setPreviewIndex(state.points.length - 1);
+        setPreviewIndex(path.points.length - 1);
         draw();
       } else if (e.key === '/') { // None
         setPreviewEnabled(true);
@@ -195,8 +198,11 @@ export function initInteractions() {
 }
 
 function addPointAtCursor() {
+  const path = state.paths[state.activePath];
+
   if (!state.imgLoaded) return;
-  if (state.points.length >= 50) return; // limit to 50 points
+  if (path.points.length >= 50) return; // limit to 50 points
+
 
   const { imgRect } = layout();
   const within = state.lastMouse.x >= imgRect.x && state.lastMouse.x <= imgRect.x + imgRect.w &&
@@ -204,31 +210,34 @@ function addPointAtCursor() {
   const cx = within ? state.lastMouse.x : (imgRect.x + imgRect.w / 2);
   const cy = within ? state.lastMouse.y : (imgRect.y + imgRect.h / 2);
   const ip = canvasToImagePx(cx, cy);
-  const initialHeading = state.selected >= 0 ? state.points[state.selected].headingRad : 0;
+  const initialHeading = path.selected >= 0 ? path.points[path.selected].headingRad : 0;
 
   pushHistory();
-  state.points.push({ xPx: ip.x, yPx: ip.y, headingRad: initialHeading, locked: false });
-  state.selected = state.points.length - 1;
+  path.points.push({ xPx: ip.x, yPx: ip.y, headingRad: initialHeading, locked: false });
+  path.selected = path.points.length - 1;
 
-  if (state.previewEnabled && state.previewIndex === state.points.length - 2) {
-    state.previewIndex = state.points.length - 1;
+  if (state.previewEnabled && state.previewIndex === path.points.length - 2) {
+    state.previewIndex = path.points.length - 1;
   }
 
   syncSelectedUI(); updateTable(); draw();
 }
 
 function rotateSelected(dr) {
-  state.points[state.selected].headingRad = normalize(state.points[state.selected].headingRad + dr);
-  els.headingDeg.value = formatDegForUI(state.points[state.selected].headingRad).toFixed(1);
+  path.points[path.selected].headingRad = normalize(path.points[path.selected].headingRad + dr);
+  els.headingDeg.value = formatDegForUI(path.points[path.selected].headingRad).toFixed(1);
   updateTable(); draw();
 }
 
 function hitTest(cx, cy) {
   if (!state.imgLoaded) return null;
+
+  const path = state.paths[state.activePath];
+
   const { imgRect } = layout();
   const within = cx >= imgRect.x && cx <= imgRect.x + imgRect.w && cy >= imgRect.y && cy <= imgRect.y + imgRect.h;
-  for (let i = state.points.length - 1; i >= 0; i--) {
-    const p = state.points[i];
+  for (let i = path.points.length - 1; i >= 0; i--) {
+    const p = path.points[i];
     const px = imgRect.x + p.xPx * (imgRect.w / state.img.width);
     const py = imgRect.y + p.yPx * (imgRect.h / state.img.height);
 

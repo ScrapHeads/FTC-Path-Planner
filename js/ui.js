@@ -13,10 +13,11 @@ import { layout, pxToField, fieldToImagePx } from './layout.js';
 import { draw } from './draw.js';
 import { normalize } from './utils.js';
 import { updateAxesUI } from './els.js';
+import { doExport } from './io_export.js';
 
-export function initUI(){
+export function initUI() {
   // Axes toggle
-  els.axesFtc.addEventListener('change', ()=>{
+  els.axesFtc.addEventListener('change', () => {
     updateAxesUI();
     syncSelectedUI();
     updateTable();
@@ -25,8 +26,8 @@ export function initUI(){
   updateAxesUI();
 
   // Heading wrap toggle (±180 / ±π vs full)
-  if (els.headingWrap){
-    els.headingWrap.addEventListener('change', ()=>{
+  if (els.headingWrap) {
+    els.headingWrap.addEventListener('change', () => {
       state.headingWrapHalf = !!els.headingWrap.checked;
       syncSelectedUI();
       updateTable();
@@ -40,8 +41,8 @@ export function initUI(){
   installTransformControls(); // Mirror/Rotate panel
 
   // Undo
-  els.undoBtn.addEventListener('click', ()=>{
-    if (undo()){
+  els.undoBtn.addEventListener('click', () => {
+    if (undo()) {
       clampPreviewAfterChange();
       refreshPreviewUI();
       syncSelectedUI();
@@ -51,8 +52,8 @@ export function initUI(){
   });
 
   // Redo (hard-coded in index.html)
-  els.redoBtn.addEventListener('click', ()=>{
-    if (redo()){
+  els.redoBtn.addEventListener('click', () => {
+    if (redo()) {
       clampPreviewAfterChange();
       refreshPreviewUI();
       syncSelectedUI();
@@ -62,8 +63,8 @@ export function initUI(){
   });
 
   // Delete selected
-  els.deleteBtn.addEventListener('click', ()=>{
-    if(state.selected >= 0){
+  els.deleteBtn.addEventListener('click', () => {
+    if (state.selected >= 0) {
       pushHistory();
       state.points.splice(state.selected, 1);
       state.selected = Math.min(state.selected, state.points.length - 1);
@@ -76,12 +77,13 @@ export function initUI(){
   });
 
   // Clear all
-  els.clearBtn.addEventListener('click', ()=>{
-    if(confirm('Clear all points?')){
-      if (state.points.length) pushHistory();
-      state.points = [];
+  els.clearBtn.addEventListener('click', () => {
+    if (confirm('Clear selected path\'s points?')) {
+      const path = state.paths[state.activePath];
+      if (path.points.length) pushHistory();
+      path.points = [];
       state.selected = -1;
-      if (state.previewEnabled) state.previewIndex = -1;
+      if (path.previewEnabled) path.previewIndex = -1;
       refreshPreviewUI();
       syncSelectedUI();
       updateTable();
@@ -90,8 +92,8 @@ export function initUI(){
   });
 
   // Direct pose editing (blocked if locked)
-  els.selXIn.addEventListener('change', ()=>{
-    if(state.selected < 0 || !state.imgLoaded) return;
+  els.selXIn.addEventListener('change', () => {
+    if (state.selected < 0 || !state.imgLoaded) return;
     if (state.points[state.selected].locked) return;
     pushHistory();
     const X = parseFloat(els.selXIn.value || '0');
@@ -103,8 +105,8 @@ export function initUI(){
     draw();
   });
 
-  els.selYIn.addEventListener('change', ()=>{
-    if(state.selected < 0 || !state.imgLoaded) return;
+  els.selYIn.addEventListener('change', () => {
+    if (state.selected < 0 || !state.imgLoaded) return;
     if (state.points[state.selected].locked) return;
     pushHistory();
     const X = getSelX();
@@ -116,16 +118,32 @@ export function initUI(){
     draw();
   });
 
-  els.headingDeg.addEventListener('change', ()=>{
-    if(state.selected < 0) return;
+  els.headingDeg.addEventListener('change', () => {
+    if (state.selected < 0) return;
     if (state.points[state.selected].locked) return;
     pushHistory();
     const deg = parseFloat(els.headingDeg.value || '0');
     // Accept either form; we convert to radians then normalize internal storage
-    const rad = deg * Math.PI/180;
+    const rad = deg * Math.PI / 180;
     state.points[state.selected].headingRad = normalize(rad);
     updateTable();
     draw();
+  });
+
+  els.path1Btn.addEventListener('click', () => {
+    setActivePath(0);
+  });
+
+  els.path2Btn.addEventListener('click', () => {
+    setActivePath(1);
+  });
+
+  els.path3Btn.addEventListener('click', () => {
+    setActivePath(2);
+  });
+
+  els.path4Btn.addEventListener('click', () => {
+    setActivePath(3);
   });
 
   // Robot footprint options
@@ -134,7 +152,21 @@ export function initUI(){
   els.boxRotate.addEventListener('change', draw);
 }
 
-function installPreviewControls(){
+function setActivePath(idx) {
+  state.activePath = idx;
+  // Highlight the selected path button, remove highlight from others
+  [els.path1Btn, els.path2Btn, els.path3Btn, els.path4Btn].forEach((btn, i) => {
+    if (btn) btn.classList.toggle('active-path', i === idx);
+  });
+  refreshPreviewUI();
+  draw();
+  doExport();
+  updateTable();
+}
+
+function installPreviewControls() {
+  const path = state.paths[state.activePath];
+
   const left = document.querySelector('.left');
   const wrap = document.createElement('div');
   wrap.className = 'panel-group';
@@ -173,49 +205,50 @@ function installPreviewControls(){
   // Place above "2) Waypoints"
   left.insertBefore(wrap, left.querySelector('h2:nth-of-type(2)'));
 
-  const toggle  = wrap.querySelector('#previewToggle');
-  const prev    = wrap.querySelector('#previewPrev');
-  const next    = wrap.querySelector('#previewNext');
-  const allBtn  = wrap.querySelector('#previewAll');
+  const toggle = wrap.querySelector('#previewToggle');
+  const prev = wrap.querySelector('#previewPrev');
+  const next = wrap.querySelector('#previewNext');
+  const allBtn = wrap.querySelector('#previewAll');
   const noneBtn = wrap.querySelector('#previewNone');
-  const slider  = wrap.querySelector('#previewSlider');
-  const status  = wrap.querySelector('#previewStatus');
-  const dimChk  = wrap.querySelector('#dimFutureToggle');
+  const slider = wrap.querySelector('#previewSlider');
+  const status = wrap.querySelector('#previewStatus');
+  const dimChk = wrap.querySelector('#dimFutureToggle');
 
-  toggle.addEventListener('change', ()=>{
+  toggle.addEventListener('change', () => {
     setPreviewEnabled(toggle.checked);
-    if (toggle.checked && state.previewIndex < 0) setPreviewIndex(state.points.length - 1);
+    if (toggle.checked && path.previewIndex < 0) setPreviewIndex(path.points.length - 1);
     refreshPreviewUI(); draw();
   });
 
-  prev.addEventListener('click', ()=>{ stepPreview(-1); refreshPreviewUI(); draw(); });
-  next.addEventListener('click', ()=>{ stepPreview(+1); refreshPreviewUI(); draw(); });
-  allBtn.addEventListener('click', ()=>{ setPreviewEnabled(true); setPreviewIndex(state.points.length - 1); refreshPreviewUI(); draw(); });
-  noneBtn.addEventListener('click', ()=>{ setPreviewEnabled(true); setPreviewIndex(-1); refreshPreviewUI(); draw(); });
+  prev.addEventListener('click', () => { stepPreview(-1); refreshPreviewUI(); draw(); });
+  next.addEventListener('click', () => { stepPreview(+1); refreshPreviewUI(); draw(); });
+  allBtn.addEventListener('click', () => { setPreviewEnabled(true); setPreviewIndex(path.points.length - 1); refreshPreviewUI(); draw(); });
+  noneBtn.addEventListener('click', () => { setPreviewEnabled(true); setPreviewIndex(-1); refreshPreviewUI(); draw(); });
 
-  slider.addEventListener('input', ()=>{
+  slider.addEventListener('input', () => {
     setPreviewIndex(parseInt(slider.value, 10));
     refreshPreviewUI(); draw();
   });
 
-  dimChk.addEventListener('change', ()=>{ state.dimFuture = !!dimChk.checked; draw(); });
+  dimChk.addEventListener('change', () => { state.dimFuture = !!dimChk.checked; draw(); });
 
-  function _refresh(){
+  function _refresh() {
+    const path = state.paths[state.activePath];
     slider.min = String(-1);
-    slider.max = String(Math.max(-1, state.points.length - 1));
+    slider.max = String(Math.max(-1, path.points.length - 1));
     slider.value = String(state.previewIndex);
     toggle.checked = state.previewEnabled;
     dimChk.checked = state.dimFuture;
     const vis = getVisibleWaypointCount();
     status.textContent = state.previewEnabled
-      ? `Showing ${vis} of ${state.points.length} points (index ${state.previewIndex})`
-      : `Preview disabled • ${state.points.length} points`;
+      ? `Showing ${vis} of ${path.points.length} points (index ${state.previewIndex})`
+      : `Preview disabled • ${path.points.length} points`;
   }
   refreshPreviewUI = _refresh;
   _refresh();
 }
 
-function installTransformControls(){
+function installTransformControls() {
   const left = document.querySelector('.left');
   const wrap = document.createElement('div');
   wrap.className = 'panel-group';
@@ -240,36 +273,37 @@ function installTransformControls(){
   const flipXBtn = wrap.querySelector('#flipXBtn');
   const flipYBtn = wrap.querySelector('#flipYBtn');
   const rotCCWBtn = wrap.querySelector('#rotCCWBtn');
-  const rotCWBtn  = wrap.querySelector('#rotCWBtn');
+  const rotCWBtn = wrap.querySelector('#rotCWBtn');
   const rot180Btn = wrap.querySelector('#rot180Btn');
 
-  flipXBtn.addEventListener('click', ()=>{ applyTransform('mirrorX'); });
-  flipYBtn.addEventListener('click', ()=>{ applyTransform('mirrorY'); });
-  rotCCWBtn.addEventListener('click', ()=>{ applyTransform('rotCCW'); });
-  rotCWBtn .addEventListener('click', ()=>{ applyTransform('rotCW'); });
-  rot180Btn.addEventListener('click', ()=>{ applyTransform('rot180'); });
+  flipXBtn.addEventListener('click', () => { applyTransform('mirrorX'); });
+  flipYBtn.addEventListener('click', () => { applyTransform('mirrorY'); });
+  rotCCWBtn.addEventListener('click', () => { applyTransform('rotCCW'); });
+  rotCWBtn.addEventListener('click', () => { applyTransform('rotCW'); });
+  rot180Btn.addEventListener('click', () => { applyTransform('rot180'); });
 }
 
 // Will be set in installPreviewControls
-let refreshPreviewUI = ()=>{};
+let refreshPreviewUI = () => { };
 
-export function updateTable(){
+export function updateTable() {
   els.pointRows.innerHTML = '';
-  state.points.forEach((p, i)=>{
-    const {imgRect} = layout();
+  const path = state.paths[state.activePath];
+  path.points.forEach((p, i) => {
+    const { imgRect } = layout();
     const cx = imgRect.x + p.xPx * (imgRect.w / state.img.width);
     const cy = imgRect.y + p.yPx * (imgRect.h / state.img.height);
     const f = pxToField(cx, cy);
     const tr = document.createElement('tr');
     const degStr = formatDeg(p.headingRad).toFixed(1);
     tr.innerHTML = `
-      <td>${i+1}</td>
+      <td>${i + 1}</td>
       <td>${f.x.toFixed(2)}</td>
       <td>${f.y.toFixed(2)}</td>
       <td>${degStr}</td>
       <td>
         <div class="custom-checkbox-wrapper">
-          <input type="checkbox" id="lock${i}" class="hidden-checkbox lock" data-idx="${i}" ${p.locked?'checked':''}>
+          <input type="checkbox" id="lock${i}" class="hidden-checkbox lock" data-idx="${i}" ${p.locked ? 'checked' : ''}>
           <label for="lock${i}" class="custom-checkbox-label">
             <span class="custom-checkbox-box"></span>
             lock
@@ -286,27 +320,27 @@ export function updateTable(){
   });
 
   // Lock toggles
-  els.pointRows.querySelectorAll('input.lock').forEach(inp=>{
-    inp.onchange = ()=>{
-      const i = parseInt(inp.dataset.idx,10);
-      state.points[i].locked = inp.checked;
-      draw(); // visual feedback
+  els.pointRows.querySelectorAll('input.lock').forEach(inp => {
+    inp.onchange = () => {
+      const i = parseInt(inp.dataset.idx, 10);
+      path.points[i].locked = inp.checked;
+      draw();
     };
   });
 
   // Row actions
-  els.pointRows.querySelectorAll('button.sel').forEach(btn=>{
-    btn.onclick = ()=>{
+  els.pointRows.querySelectorAll('button.sel').forEach(btn => {
+    btn.onclick = () => {
       state.selected = parseInt(btn.dataset.idx, 10);
       syncSelectedUI();
       draw();
     };
   });
 
-  els.pointRows.querySelectorAll('button.up').forEach(btn=>{
-    btn.onclick = ()=>{
+  els.pointRows.querySelectorAll('button.up').forEach(btn => {
+    btn.onclick = () => {
       const i = parseInt(btn.dataset.idx, 10);
-      if (i > 0){
+      if (i > 0) {
         pushHistory();
         swap(state.points, i, i - 1);
         state.selected = (state.selected === i ? i - 1 : state.selected === i - 1 ? i : state.selected);
@@ -318,10 +352,10 @@ export function updateTable(){
     };
   });
 
-  els.pointRows.querySelectorAll('button.down').forEach(btn=>{
-    btn.onclick = ()=>{
+  els.pointRows.querySelectorAll('button.down').forEach(btn => {
+    btn.onclick = () => {
       const i = parseInt(btn.dataset.idx, 10);
-      if (i < state.points.length - 1){
+      if (i < state.points.length - 1) {
         pushHistory();
         swap(state.points, i, i + 1);
         state.selected = (state.selected === i ? i + 1 : state.selected === i + 1 ? i : state.selected);
@@ -334,15 +368,17 @@ export function updateTable(){
   });
 }
 
-export function syncSelectedUI(){
-  if (state.selected < 0 || !state.imgLoaded){
+export function syncSelectedUI() {
+  if (state.selected < 0 || !state.imgLoaded) {
     els.selXIn.value = '';
     els.selYIn.value = '';
     els.headingDeg.value = '';
     return;
   }
-  const {imgRect} = layout();
-  const p = state.points[state.selected];
+
+  const { imgRect } = layout();
+  const path = state.paths[state.activePath];
+  const p = path.points[state.selected];
   const cx = imgRect.x + p.xPx * (imgRect.w / state.img.width);
   const cy = imgRect.y + p.yPx * (imgRect.h / state.img.height);
   const f = pxToField(cx, cy);
@@ -354,14 +390,14 @@ export function syncSelectedUI(){
 // ------------------------
 // Transform helpers
 // ------------------------
-function applyTransform(kind){
+function applyTransform(kind) {
   if (!state.imgLoaded || state.points.length === 0) return;
 
   pushHistory();
 
   const { imgRect } = layout();
   // Map all points: image→canvas→field, transform, field→image
-  state.points = state.points.map(p=>{
+  state.points = state.points.map(p => {
     // image px -> canvas px
     const cx = imgRect.x + p.xPx * (imgRect.w / state.img.width);
     const cy = imgRect.y + p.yPx * (imgRect.h / state.img.height);
@@ -384,38 +420,38 @@ function applyTransform(kind){
   draw();
 }
 
-function transformFieldPose(x, y, h, kind){
-  switch(kind){
+function transformFieldPose(x, y, h, kind) {
+  switch (kind) {
     case 'mirrorX':   // flip across X axis: (x, y)->(x, -y), θ'=-θ
-      return { x: x,    y: -y,   h: -h };
+      return { x: x, y: -y, h: -h };
     case 'mirrorY':   // flip across Y axis: (x, y)->(-x, y), θ'=π-θ
-      return { x: -x,   y: y,    h: Math.PI - h };
+      return { x: -x, y: y, h: Math.PI - h };
     case 'rotCCW':    // +90° CCW: (x, y)->(-y, x), θ'=θ+π/2
-      return { x: -y,   y: x,    h: h + Math.PI/2 };
+      return { x: -y, y: x, h: h + Math.PI / 2 };
     case 'rotCW':     // -90° CW: (x, y)->(y, -x), θ'=θ-π/2
-      return { x: y,    y: -x,   h: h - Math.PI/2 };
+      return { x: y, y: -x, h: h - Math.PI / 2 };
     case 'rot180':    // 180°: (x, y)->(-x, -y), θ'=θ+π
-      return { x: -x,   y: -y,   h: h + Math.PI };
+      return { x: -x, y: -y, h: h + Math.PI };
     default:
       return { x, y, h };
   }
 }
 
-function clampPreviewAfterChange(){
+function clampPreviewAfterChange() {
   if (state.previewEnabled && state.previewIndex > state.points.length - 1) {
     state.previewIndex = state.points.length - 1;
   }
 }
 
-function swap(arr, i, j){
+function swap(arr, i, j) {
   const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
 }
-function getSelX(){ return parseFloat(els.selXIn.value || '0'); }
-function getSelY(){ return parseFloat(els.selYIn.value || '0'); }
+function getSelX() { return parseFloat(els.selXIn.value || '0'); }
+function getSelY() { return parseFloat(els.selYIn.value || '0'); }
 
 // Format degrees based on wrapping preference
-function formatDeg(rad){
-  if (state.headingWrapHalf){
+function formatDeg(rad) {
+  if (state.headingWrapHalf) {
     // -180…+180
     let d = (normalize(rad) * 180 / Math.PI);
     return d;

@@ -95,7 +95,8 @@ export function doExport() {
   const measurementUnit = getMeasurementUnit();
   console.log('Exporting with measurement unit:', measurementUnit);
 
-  const poses = state.points.map((p, i) => {
+  const path = state.paths[state.activePath];
+  const poses = path.points.map((p, i) => {
     const { imgRect } = layout();
     const cx = imgRect.x + p.xPx * (imgRect.w / state.img.width);
     const cy = imgRect.y + p.yPx * (imgRect.h / state.img.height);
