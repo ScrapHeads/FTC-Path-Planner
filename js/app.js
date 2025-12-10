@@ -1,7 +1,7 @@
 import { els, canvas } from './els.js';
 import { setCanvasSize } from './layout.js';
 import { draw } from './draw.js';
-import { initUI, setActivePath } from './ui.js';
+import { initUI } from './ui.js';
 import { initInteractions } from './interactions.js';
 import { initImageIO } from './io_image.js';
 import { initExport } from './io_export.js';
@@ -16,7 +16,6 @@ function boot(){
   initImport();
   initExport();
   requestAnimationFrame(draw);
-  setActivePath(0);
 }
 
 window.addEventListener('resize', ()=>{ setCanvasSize(); draw(); });

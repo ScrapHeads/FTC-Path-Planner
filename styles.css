@@ -158,11 +158,6 @@ code{
   box-shadow: 0 0 0 1px var(--accent); /* Focus indicator */
 }
 
-.active-path {
-  background: var(--accent);
-  color: #fff;
-  font-weight: bold;
-}
 
 /* UI bits */
 h1{font-size:18px;margin:0 0 10px 0}
