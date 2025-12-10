@@ -21,7 +21,6 @@ export const els = {
   redoBtn: document.getElementById('redoBtn'),  
   deleteBtn: document.getElementById('deleteBtn'),
   clearBtn: document.getElementById('clearBtn'),
-  clearAllBtn: document.getElementById('clearAllBtn'),
   loadBtn: document.getElementById('loadBtn'),
 
   // Direct pose edits
@@ -31,12 +30,6 @@ export const els = {
 
   // Heading wrapping
   headingWrap: document.getElementById('headingWrap'),
-
-  // Setting the paths
-  path1Btn: document.getElementById('path1'),
-  path2Btn: document.getElementById('path2'),
-  path3Btn: document.getElementById('path3'),
-  path4Btn: document.getElementById('path4'),
 
   // Export UI
   javaType: document.getElementById('javaType'),

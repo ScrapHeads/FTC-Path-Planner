@@ -9,7 +9,6 @@ import { loadImage } from './io_image.js';
 
 export function initImport() {
   els.loadBtn.addEventListener('click', () => {
-    const path = state.paths[state.activePath];
     const inp = document.createElement('input');
     inp.type = 'file';
     inp.accept = '.json,.csv,.java,.txt,application/json,text/plain,text/csv';
@@ -21,7 +20,7 @@ export function initImport() {
         pushHistory();
         await importWaypointsFromText(text, name);
         loadImage(els.sampleSelect.value || '', false); // reload current image
-        state.selected = path.points.length ? 0 : -1;
+        state.selected = state.points.length ? 0 : -1;
         syncSelectedUI(); updateTable(); draw();
       } catch (err) {
         console.error(err);
@@ -247,8 +246,7 @@ async function importWaypointsFromText(text, filename) {
 }
 
 function loadPosesIntoPoints(poses) {
-  const path = state.paths[state.activePath];
-  path.points = poses.map(p => {
+  state.points = poses.map(p => {
     const ip = fieldToImagePx(p.x, p.y);
     return { xPx: ip.x, yPx: ip.y, headingRad: +p.h || 0, locked: !!p.locked };
   });
