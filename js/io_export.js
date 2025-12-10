@@ -218,7 +218,7 @@ function buildExportArtifacts(poses, cfg) {
     const degStr = deg.toFixed(1);
     const comma = (idx < poses.length - 1) ? ',' : '';
     const lockTag = p.locked ? ' locked=true' : '';
-    return `    ${poseCtor(p.x.toFixed(3), p.y.toFixed(3), p.h.toFixed(6))}${comma}  // #${idx + 1}  x=${p.x.toFixed(3)}${mUnit}, y=${p.y.toFixed(3)}${mUnit}, θ=${degStr}°${lockTag}`;
+    return `\t\t${poseCtor(p.x.toFixed(3), p.y.toFixed(3), p.h.toFixed(6))}${comma}  // #${idx + 1}  x=${p.x.toFixed(3)}${mUnit}, y=${p.y.toFixed(3)}${mUnit}, θ=${degStr}°${lockTag}`;
   }).join('\n');
 
   const snippet = (cfg.kind === 'list')
@@ -241,8 +241,8 @@ ${poseLines}
   // java-class
   const pkgLine = cfg.pkg ? `package ${cfg.pkg};\n\n` : '';
   const bodyDecl = (cfg.kind === 'list')
-    ? 'public static final List<Pose2d> PATH = Arrays.asList(\n' + poseLines + '\n);'
-    : 'public static final Pose2d[] PATH = new Pose2d[]{\n' + poseLines + '\n};';
+    ? 'public static final List<Pose2d> PATH = Arrays.asList(\n' + poseLines + '\n\t);'
+    : 'public static final Pose2d[] PATH = new Pose2d[]{\n' + poseLines + '\n\t};';
 
   const javaClass = `${pkgLine}${headerComment}import java.util.*;
 ${importLines}

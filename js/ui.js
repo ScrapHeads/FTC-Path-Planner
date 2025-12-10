@@ -87,6 +87,23 @@ export function initUI() {
       refreshPreviewUI();
       syncSelectedUI();
       updateTable();
+      doExport();
+      draw();
+    }
+  });
+
+  els.clearAllBtn.addEventListener('click', () => {
+    if (confirm('Clear all paths\' points?')) {
+      state.paths.forEach(path => {
+        if (path.points.length) pushHistory();
+        path.points = [];
+        path.previewIndex = -1;
+      });
+      state.selected = -1;
+      refreshPreviewUI();
+      syncSelectedUI();
+      updateTable();
+      doExport();
       draw();
     }
   });
@@ -152,8 +169,10 @@ export function initUI() {
   els.boxRotate.addEventListener('change', draw);
 }
 
-function setActivePath(idx) {
+export function setActivePath(idx) {
   state.activePath = idx;
+  state.selected = -1;
+  syncSelectedUI();
   // Highlight the selected path button, remove highlight from others
   [els.path1Btn, els.path2Btn, els.path3Btn, els.path4Btn].forEach((btn, i) => {
     if (btn) btn.classList.toggle('active-path', i === idx);

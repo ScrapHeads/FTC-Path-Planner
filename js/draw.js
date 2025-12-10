@@ -21,7 +21,7 @@ export function draw() {
     }
 
     drawPoints();
-    drawMeasurement();
+    // drawMeasurement();
     drawHoverLabel();
     if (state.hudVisible) drawHUD();
     drawPaths(ctx);
@@ -235,7 +235,6 @@ function drawHUD() {
     'P: Toggle preview   [ / ]: Step   \\\\: All   /: None',
     'Ctrl+Z / Ctrl+Y: Undo / Redo',
     'Delete: Remove selected   Ctrl+D: Duplicate',
-    'M (hold): Measure (1in, Shift=0.5in)',
     'H: Toggle this HUD'
   ];
   const pad = 8 * dpi;

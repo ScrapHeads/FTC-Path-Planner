@@ -38,15 +38,15 @@ export function initInteractions() {
     handleHoverIdle(m);
 
     // Measure tool: update with snapping
-    if (state.measureActive) {
-      const snapIn = e.shiftKey ? 0.5 : 1.0;
-      const startSnapped = snapCanvasToGrid(state.measureStart, snapIn);
-      const endSnapped = snapCanvasToGrid(m, snapIn);
-      state.measureStart = startSnapped;
-      state.measureEnd = endSnapped;
-      draw();
-      return;
-    }
+    // if (state.measureActive) {
+    //   const snapIn = e.shiftKey ? 0.5 : 1.0;
+    //   const startSnapped = snapCanvasToGrid(state.measureStart, snapIn);
+    //   const endSnapped = snapCanvasToGrid(m, snapIn);
+    //   state.measureStart = startSnapped;
+    //   state.measureEnd = endSnapped;
+    //   draw();
+    //   return;
+    // }
 
     const path = state.paths[state.activePath];
     if (path.selected < 0 || path.dragMode === null) return;
@@ -156,8 +156,8 @@ export function initInteractions() {
     }
 
     // Q/E rotation: Q = CCW (+), E = CW (−)
-    if (path.selected >= 0 && (e.key.toLowerCase() === 'q' || e.key.toLowerCase() === 'e') && !typing) {
-      if (path.points[path.selected].locked) return;
+    if (state.selected >= 0 && (e.key.toLowerCase() === 'q' || e.key.toLowerCase() === 'e') && !typing) {
+      if (path.points[state.selected].locked) return;
       const dir = e.key.toLowerCase() === 'q' ? +1 : -1;
       const base = e.shiftKey ? 15 : 5;
       const step = base * Math.PI / 180;
@@ -210,22 +210,23 @@ function addPointAtCursor() {
   const cx = within ? state.lastMouse.x : (imgRect.x + imgRect.w / 2);
   const cy = within ? state.lastMouse.y : (imgRect.y + imgRect.h / 2);
   const ip = canvasToImagePx(cx, cy);
-  const initialHeading = path.selected >= 0 ? path.points[path.selected].headingRad : 0;
+  const initialHeading = state.selected >= 0 ? path.points[state.selected].headingRad : 0;
 
   pushHistory();
   path.points.push({ xPx: ip.x, yPx: ip.y, headingRad: initialHeading, locked: false });
-  path.selected = path.points.length - 1;
+  state.selected = path.points.length - 1;
 
-  if (state.previewEnabled && state.previewIndex === path.points.length - 2) {
-    state.previewIndex = path.points.length - 1;
+  if (path.previewEnabled && path.previewIndex === path.points.length - 2) {
+    path.previewIndex = path.points.length - 1;
   }
 
   syncSelectedUI(); updateTable(); draw();
 }
 
 function rotateSelected(dr) {
-  path.points[path.selected].headingRad = normalize(path.points[path.selected].headingRad + dr);
-  els.headingDeg.value = formatDegForUI(path.points[path.selected].headingRad).toFixed(1);
+  const path = state.paths[state.activePath];
+  path.points[state.selected].headingRad = normalize(path.points[state.selected].headingRad + dr);
+  els.headingDeg.value = formatDegForUI(path.points[state.selected].headingRad).toFixed(1);
   updateTable(); draw();
 }
 

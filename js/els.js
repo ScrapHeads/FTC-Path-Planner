@@ -21,6 +21,7 @@ export const els = {
   redoBtn: document.getElementById('redoBtn'),  
   deleteBtn: document.getElementById('deleteBtn'),
   clearBtn: document.getElementById('clearBtn'),
+  clearAllBtn: document.getElementById('clearAllBtn'),
   loadBtn: document.getElementById('loadBtn'),
 
   // Direct pose edits
