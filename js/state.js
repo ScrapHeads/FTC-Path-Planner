@@ -1,5 +1,5 @@
 // Shared mutable state
-export const PATH_COLORS = ['#e57373', '#64b5f6', '#81c784', '#ffb74d']; // red, blue, green, orange
+export const PATH_COLORS = ['#666666', '#FD3DB5', '#81c784', '#ffb74d']; // silver, magenta, green, orange
 
 export const state = {
   // Up to 4 path objects, each with its own metadata and points
