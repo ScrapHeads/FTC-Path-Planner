@@ -1,17 +1,47 @@
 // Shared mutable state
+export const PATH_COLORS = ['#666666', '#FD3DB5', '#81c784', '#ffb74d']; // silver, magenta, green, orange
+
 export const state = {
+  // Up to 4 path objects, each with its own metadata and points
+  paths: [
+    {
+      name: "Path 1",
+      color: PATH_COLORS[0],
+      points: [],
+      previewEnabled: false,
+      previewIndex: -1,
+    },
+    {
+      name: "Path 2",
+      color: PATH_COLORS[1],
+      points: [],
+      previewEnabled: false,
+      previewIndex: -1,
+    },
+    {
+      name: "Path 3",
+      color: PATH_COLORS[2],
+      points: [],
+      previewEnabled: false,
+      previewIndex: -1,
+    },
+    {
+      name: "Path 4",
+      color: PATH_COLORS[3],
+      points: [],
+      previewEnabled: false,
+      previewIndex: -1,
+    }
+  ],
+  activePath: 0, // Index of the currently selected path
+
   img: new Image(),
   imgLoaded: false,
-  points: [],            // { xPx, yPx, headingRad, locked? } in IMAGE px
+
   selected: -1,
   lastMouse: { x:0, y:0 },
-  dragMode: null,        // 'move' | 'rotate' | null
-  chosenDirHandle: null, // File System Access API directory handle (Chromium)
-
-  // Preview / step-through
-  previewEnabled: false,
-  previewIndex: -1,      // -1 = show none; otherwise 0..points.length-1
-  dimFuture: true,
+  dragMode: null,
+  chosenDirHandle: null,
 
   // Heading wrapping (off = 0..360 / 0..2π, on = ±180 / ±π)
   headingWrapHalf: false,
@@ -22,57 +52,69 @@ export const state = {
   _histMax: 100,
 
   // Measure tool
-  measureActive: false,      // true while holding 'M'
-  measureStart: { x:0, y:0}, // canvas px (snapped while measuring)
-  measureEnd:   { x:0, y:0}, // canvas px (snapped while measuring)
+  measureActive: false,
+  measureStart: { x:0, y:0 },
+  measureEnd:   { x:0, y:0 },
 
   // Mini HUD
   hudVisible: true,
 
   // Hover label
-  hoverActive: false,        // true when mouse idle on field
-  hoverPos: { x:0, y:0 },    // canvas px
-  _hoverTimer: null          // internal timer handle
+  hoverActive: false,
+  hoverPos: { x:0, y:0 },
+  _hoverTimer: null
 };
 
 // ---- Preview helpers ----
 export function setPreviewEnabled(on){
-  state.previewEnabled = !!on;
-  if (!on) state.previewIndex = state.points.length - 1;
+  const path = state.paths[state.activePath];
+  path.previewEnabled = !!on;
+  if (!on) path.previewIndex = path.points.length - 1;
 }
 
 export function setPreviewIndex(idx){
-  if (!state.points.length) { state.previewIndex = -1; return; }
-  state.previewIndex = Math.max(-1, Math.min(idx, state.points.length - 1));
+  const path = state.paths[state.activePath];
+  if (!path.points.length) { path.previewIndex = -1; return; }
+  path.previewIndex = Math.max(-1, Math.min(idx, path.points.length - 1));
 }
 
-export function stepPreview(delta){ setPreviewIndex(state.previewIndex + delta); }
+export function stepPreview(delta){ setPreviewIndex(state.paths[state.activePath].previewIndex + delta); }
 
 export function getVisibleWaypointCount(){
-  if (!state.previewEnabled) return state.points.length;
-  return Math.max(0, state.previewIndex + 1);
+  const path = state.paths[state.activePath];
+  if (!path.previewEnabled) return path.points.length;
+  return Math.max(0, path.previewIndex + 1);
 }
 
 // ---- History helpers ----
 function snapshot(){
   return {
-    points: state.points.map(p => ({
-      xPx:+p.xPx, yPx:+p.yPx, headingRad:+p.headingRad, locked: !!p.locked
+    paths: state.paths.map(path => ({
+      name: path.name,
+      color: path.color,
+      points: path.points.map(p => ({
+        xPx:+p.xPx, yPx:+p.yPx, headingRad:+p.headingRad, locked: !!p.locked
+      })),
+      previewEnabled: !!path.previewEnabled,
+      previewIndex: path.previewIndex
     })),
-    selected: state.selected,
-    previewEnabled: state.previewEnabled,
-    previewIndex: state.previewIndex,
+    activePath: state.activePath,
     headingWrapHalf: state.headingWrapHalf
   };
 }
 
 function restore(snap){
-  state.points = snap.points.map(p => ({
-    xPx:+p.xPx, yPx:+p.yPx, headingRad:+p.headingRad, locked: !!p.locked
+  state.paths = snap.paths.map(path => ({
+    name: path.name,
+    color: path.color,
+    points: path.points.map(p => ({
+      xPx:+p.xPx, yPx:+p.yPx, headingRad:+p.headingRad, locked: !!p.locked
+    })),
+    previewEnabled: !!path.previewEnabled,
+    previewIndex: path.previewIndex
   }));
-  state.selected = Math.min(Math.max(-1, snap.selected ?? -1), state.points.length - 1);
-  state.previewEnabled = !!snap.previewEnabled;
-  state.previewIndex = Math.min(Math.max(-1, snap.previewIndex ?? -1), state.points.length - 1);
+  state.activePath = Math.max(0, Math.min(snap.activePath ?? 0, state.paths.length - 1));
+  state.selected = -1;
   state.headingWrapHalf = !!snap.headingWrapHalf;
 }
 
