@@ -1,6 +1,8 @@
 import { ctx, dpi, els, getMeasurementUnit } from './els.js';
 import { state, getVisibleWaypointCount, PATH_COLORS } from './state.js';
 import { layout, pxPerFieldSize, pxToField } from './layout.js';
+import { doExport } from './io_export.js';
+import { updateTable } from './ui.js';
 
 export function draw() {
   try {
@@ -25,6 +27,7 @@ export function draw() {
     drawHoverLabel();
     if (state.hudVisible) drawHUD();
     drawPaths(ctx);
+    doExport(); // updates export data
   } catch (err) {
     console.error(err);
     alert('Render error: ' + err.message);
