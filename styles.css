@@ -158,8 +158,23 @@ code{
   box-shadow: 0 0 0 1px var(--accent); /* Focus indicator */
 }
 
-.active-path {
-  background: var(--accent);
+.active-path0 {
+  background: #666666;
+  color: #fff;
+  font-weight: bold;
+}
+.active-path1 {
+  background: #FD3DB5;
+  color: #fff;
+  font-weight: bold;
+}
+.active-path2 {
+  background: #81c784;
+  color: #fff;
+  font-weight: bold;
+}
+.active-path3 {
+  background: #ffb74d;
   color: #fff;
   font-weight: bold;
 }

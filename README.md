@@ -1,6 +1,6 @@
 # FTC Path Planner 
 
-This tool provides a browser-based interface for creating and managing robot paths on an FTC field image. It supports interactive editing, heading control, metadata, and exporting paths in multiple formats (JSON, CSV, Java). The app now supports multiple measurement units, robust import/export with metadata, and improved preset field image handling.
+This tool provides a browser-based interface for creating and managing robot paths on an FTC field image. It supports interactive editing, heading control, metadata, and exporting paths in multiple formats (JSON, CSV, Java). The app now supports multiple measurement units, robust import/export with metadata, improved preset field image handling, and multiple path support (up to 4 paths, each with its own color and preview).
 
 ---
 
@@ -18,6 +18,9 @@ https://scrapheads.github.io/FTC-Path-Planner/
 * Undo/redo with history tracking.
 * Waypoint table for numeric editing, including lock toggles with custom checkboxes.
 * Live preview of path and robot footprint.
+* Create and edit up to 4 separate paths, each with its own color and preview.
+* Switch between paths using dedicated buttons; the active path button is highlighted.
+* Each path has its own preview state and can be exported or imported independently.
 
 ### Heading
 
@@ -44,9 +47,18 @@ https://scrapheads.github.io/FTC-Path-Planner/
 
 ### Waypoint Locking
 
-* Each waypoint can be **locked**.
+* Each waypoint can be locked.
 * Locked points are exported with `locked=true` metadata.
 * Locked state is preserved on import.
+
+### Multi-Path Support
+
+* Up to 4 separate paths can be created, edited, and visualized.
+* Each path is assigned a unique color for easy distinction.
+* Switch between paths using the UI; only the active path is editable at a time.
+* All paths are drawn on the field for visual comparison.
+* Each path maintains its own preview state and waypoints.
+* Import/export supports single or multiple paths (see below).
 
 ---
 

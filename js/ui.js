@@ -175,7 +175,7 @@ export function setActivePath(idx) {
   syncSelectedUI();
   // Highlight the selected path button, remove highlight from others
   [els.path1Btn, els.path2Btn, els.path3Btn, els.path4Btn].forEach((btn, i) => {
-    if (btn) btn.classList.toggle('active-path', i === idx);
+    if (btn) btn.classList.toggle(`active-path${i}`, i === idx);
   });
   refreshPreviewUI();
   draw();
@@ -194,7 +194,7 @@ function installPreviewControls() {
     <h2>Preview / Step-through</h2>
     <label class="row">
       <div class="custom-checkbox-wrapper">
-        <input type="checkbox" id="previewToggle" class="hidden-checkbox">
+        <input type="checkbox" id="previewToggle" class="hidden-checkbox" checked>
         <label for="previewToggle" class="custom-checkbox-label">
           <span class="custom-checkbox-box"></span>
           Enable preview
@@ -249,18 +249,19 @@ function installPreviewControls() {
     refreshPreviewUI(); draw();
   });
 
-  dimChk.addEventListener('change', () => { state.dimFuture = !!dimChk.checked; draw(); });
+  dimChk.addEventListener('change', () => { state.dimFuture = dimChk.checked; draw(); });
 
   function _refresh() {
     const path = state.paths[state.activePath];
     slider.min = String(-1);
     slider.max = String(Math.max(-1, path.points.length - 1));
-    slider.value = String(state.previewIndex);
-    toggle.checked = state.previewEnabled;
+    slider.value = String(path.previewIndex);
+    console.log('Preview UI refreshed');
+    toggle.checked = path.previewEnabled;
     dimChk.checked = state.dimFuture;
     const vis = getVisibleWaypointCount();
-    status.textContent = state.previewEnabled
-      ? `Showing ${vis} of ${path.points.length} points (index ${state.previewIndex})`
+    status.textContent = path.previewEnabled
+      ? `Showing ${vis} of ${path.points.length} points (index ${path.previewIndex})`
       : `Preview disabled • ${path.points.length} points`;
   }
   refreshPreviewUI = _refresh;
@@ -410,13 +411,15 @@ export function syncSelectedUI() {
 // Transform helpers
 // ------------------------
 function applyTransform(kind) {
-  if (!state.imgLoaded || state.points.length === 0) return;
+  const point = state.paths[state.activePath];
+  if (!state.imgLoaded || point.points.length === 0) return;
 
+  console.log('Applying transform:', kind);
   pushHistory();
 
   const { imgRect } = layout();
   // Map all points: image→canvas→field, transform, field→image
-  state.points = state.points.map(p => {
+  point.points = point.points.map(p => {
     // image px -> canvas px
     const cx = imgRect.x + p.xPx * (imgRect.w / state.img.width);
     const cy = imgRect.y + p.yPx * (imgRect.h / state.img.height);
@@ -431,7 +434,7 @@ function applyTransform(kind) {
   });
 
   // Keep selection & preview valid
-  state.selected = Math.min(state.selected, state.points.length - 1);
+  state.selected = Math.min(state.selected, point.points.length - 1);
   clampPreviewAfterChange();
 
   syncSelectedUI();

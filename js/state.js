@@ -68,7 +68,7 @@ export const state = {
 // ---- Preview helpers ----
 export function setPreviewEnabled(on){
   const path = state.paths[state.activePath];
-  path.previewEnabled = !!on;
+  path.previewEnabled = on;
   if (!on) path.previewIndex = path.points.length - 1;
 }
 
