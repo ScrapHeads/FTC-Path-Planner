@@ -110,39 +110,42 @@ export function initUI() {
 
   // Direct pose editing (blocked if locked)
   els.selXIn.addEventListener('change', () => {
+    const path = state.paths[state.activePath];
     if (state.selected < 0 || !state.imgLoaded) return;
-    if (state.points[state.selected].locked) return;
+    if (path.points[state.selected].locked) return;
     pushHistory();
     const X = parseFloat(els.selXIn.value || '0');
     const Y = getSelY();
     const ip = fieldToImagePx(X, Y);
-    state.points[state.selected].xPx = ip.x;
-    state.points[state.selected].yPx = ip.y;
+    path.points[state.selected].xPx = ip.x;
+    path.points[state.selected].yPx = ip.y;
     updateTable();
     draw();
   });
 
   els.selYIn.addEventListener('change', () => {
+    const path = state.paths[state.activePath];
     if (state.selected < 0 || !state.imgLoaded) return;
-    if (state.points[state.selected].locked) return;
+    if (path.points[state.selected].locked) return;
     pushHistory();
     const X = getSelX();
     const Y = parseFloat(els.selYIn.value || '0');
     const ip = fieldToImagePx(X, Y);
-    state.points[state.selected].xPx = ip.x;
-    state.points[state.selected].yPx = ip.y;
+    path.points[state.selected].xPx = ip.x;
+    path.points[state.selected].yPx = ip.y;
     updateTable();
     draw();
   });
 
   els.headingDeg.addEventListener('change', () => {
+    const path = state.paths[state.activePath];
     if (state.selected < 0) return;
-    if (state.points[state.selected].locked) return;
+    if (path.points[state.selected].locked) return;
     pushHistory();
     const deg = parseFloat(els.headingDeg.value || '0');
     // Accept either form; we convert to radians then normalize internal storage
     const rad = deg * Math.PI / 180;
-    state.points[state.selected].headingRad = normalize(rad);
+    path.points[state.selected].headingRad = normalize(rad);
     updateTable();
     draw();
   });

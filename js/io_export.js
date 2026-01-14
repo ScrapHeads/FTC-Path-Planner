@@ -129,13 +129,16 @@ function getJavaExportConfig(lib) {
   switch (lib) {
     case 'rr':
       return {
-        imports: ['com.acmerobotics.roadrunner.geometry.Pose2d'],
+        imports: ['com.acmerobotics.roadrunner.Pose2d;'],
         poseCtor: (x, y, h) => `new Pose2d(${x}, ${y}, ${h})`
       };
     case 'ftclib':
       return {
-        imports: ['com.arcrobotics.ftclib.geometry.Pose2d'],
-        poseCtor: (x, y, h) => `new Pose2d(${x}, ${y}, ${h})`
+        imports: [
+          'com.arcrobotics.ftclib.geometry.Pose2d',
+          'com.arcrobotics.ftclib.geometry.Rotation2d;'
+        ],
+        poseCtor: (x, y, h) => `new Pose2d(${x}, ${y}, new Rotation2d(${h}))`
       };
     case 'RilLib':
       return {

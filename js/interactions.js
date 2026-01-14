@@ -87,8 +87,8 @@ export function initInteractions() {
       const snap = e.shiftKey ? (15 * Math.PI / 180) : (e.altKey ? 5 * Math.PI / 180 : 0);
       if (snap) angField = Math.round(angField / snap) * snap;
 
-      path.points[path.selected].headingRad = normalize(angField);
-      els.headingDeg.value = formatDegForUI(path.points[path.selected].headingRad).toFixed(1);
+      path.points[state.selected].headingRad = normalize(angField);
+      els.headingDeg.value = formatDegForUI(path.points[state.selected].headingRad).toFixed(1);
       updateTable(); draw();
     }
   });
