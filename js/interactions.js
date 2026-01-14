@@ -165,10 +165,10 @@ export function initInteractions() {
       rotateSelected(dir * step); // CCW-positive in field
     }
 
-    if (!typing) {
+    if (!typing) { 
       if (e.key === 'p' || e.key === 'P') {
         setPreviewEnabled(!state.previewEnabled);
-        if (state.previewEnabled && state.previewIndex < 0) setPreviewIndex(state.points.length - 1);
+        if (state.previewEnabled && state.previewIndex < 0) setPreviewIndex(state.paths[state.activePath].points.length - 1);
         draw();
       } else if (e.key === ']') {
         stepPreview(+1); draw();

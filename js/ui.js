@@ -66,8 +66,8 @@ export function initUI() {
   els.deleteBtn.addEventListener('click', () => {
     if (state.selected >= 0) {
       pushHistory();
-      state.points.splice(state.selected, 1);
-      state.selected = Math.min(state.selected, state.points.length - 1);
+      state.paths[state.activePath].points.splice(state.selected, 1);
+      state.selected = Math.min(state.selected, state.paths[state.activePath].points.length - 1);
       clampPreviewAfterChange();
       refreshPreviewUI();
       syncSelectedUI();
@@ -365,7 +365,7 @@ export function updateTable() {
       const i = parseInt(btn.dataset.idx, 10);
       if (i > 0) {
         pushHistory();
-        swap(state.points, i, i - 1);
+        swap(state.paths[state.activePath].points, i, i - 1);
         state.selected = (state.selected === i ? i - 1 : state.selected === i - 1 ? i : state.selected);
         clampPreviewAfterChange();
         refreshPreviewUI();
@@ -378,9 +378,9 @@ export function updateTable() {
   els.pointRows.querySelectorAll('button.down').forEach(btn => {
     btn.onclick = () => {
       const i = parseInt(btn.dataset.idx, 10);
-      if (i < state.points.length - 1) {
+      if (i < state.paths[state.activePath].points.length - 1) {
         pushHistory();
-        swap(state.points, i, i + 1);
+        swap(state.paths[state.activePath].points, i, i + 1);
         state.selected = (state.selected === i ? i + 1 : state.selected === i + 1 ? i : state.selected);
         clampPreviewAfterChange();
         refreshPreviewUI();
@@ -463,8 +463,8 @@ function transformFieldPose(x, y, h, kind) {
 }
 
 function clampPreviewAfterChange() {
-  if (state.previewEnabled && state.previewIndex > state.points.length - 1) {
-    state.previewIndex = state.points.length - 1;
+  if (state.previewEnabled && state.previewIndex > state.paths[state.activePath].points.length - 1) {
+    state.previewIndex = state.paths[state.activePath].points.length - 1;
   }
 }
 

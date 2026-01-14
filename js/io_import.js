@@ -58,7 +58,7 @@ async function importWaypointsFromText(text, filename) {
     if (meta.measurementUnit !== undefined && els.measurementUnit) els.measurementUnit.value = meta.measurementUnit;
     if (meta.presetField !== undefined && els.sampleSelect) els.sampleSelect.value = meta.presetField;
 
-    if (Array.isArray(obj?.poses)) {
+    if (Array.isArray(obj?.poses)) {  
       // poses with headingRad and optional locked
       const poses = obj.poses.map(p => ({ x: +p.x, y: +p.y, h: +p.headingRad, locked: !!p.locked }));
       loadPosesIntoPoints(poses);
@@ -67,7 +67,7 @@ async function importWaypointsFromText(text, filename) {
 
     if (Array.isArray(obj?.points)) {
       // image-space points (legacy)
-      state.points = obj.points.map(p => ({ xPx: +p.xPx, yPx: +p.yPx, headingRad: +p.headingRad || 0, locked: !!p.locked }));
+      state.paths[state.activePath].points = obj.points.map(p => ({ xPx: +p.xPx, yPx: +p.yPx, headingRad: +p.headingRad || 0, locked: !!p.locked }));
       return;
     }
 
