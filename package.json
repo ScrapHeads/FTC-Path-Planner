@@ -1,0 +1,8 @@
+{
+  "name": "ftc-path-planner",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}

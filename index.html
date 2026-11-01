@@ -24,8 +24,10 @@
           <label>Sample image</label>
           <select id="sampleSelect">
             <option value="">— none —</option>
-            <option value="ReferenceImages\into-the-deep.png">Roadrunner into the deep image</option>
-            <option value="ReferenceImages\decode.webp">Roadrunner decode image</option>
+            <option value="pedro-biobuzz">Pedro Pathing Biobuzz</option>
+            <option value="rr-into-the-deep">RoadRunner Into the Deep</option>
+            <option value="rr-decode">RoadRunner DECODE</option>
+            <option value="pedro-decode">Pedro Pathing DECODE</option>
           </select>
         </div>
       </div>
@@ -50,6 +52,14 @@
             <option value="cm">Centimeters</option>
             <option value="ft">Feet</option>
             <option value="in">Inches</option>
+          </select>
+        </div>
+        <div>
+          <label>Coordinate system</label>
+          <select id="coordinateSystem">
+            <option value="ftc">FTC: X forward, Y left</option>
+            <option value="pedro">Pedro: X right, Y up</option>
+            <option value="image">Image: X right, Y down</option>
           </select>
         </div>
       </div>
@@ -130,22 +140,48 @@
         </label>
       </div>
 
-      <div class="row">
-        <label>
-          <div class="custom-checkbox-wrapper"></div>
-          <input id="axesFtc" type="checkbox" class="hidden-checkbox" checked />
-          <label for="axesFtc" class="custom-checkbox-label">
-            <span class="custom-checkbox-box"></span>
-            Axes toggle: <b>X+ forward,</b> <b>Y+ left</b>
-          </label>
-        </label>
-      </div>
-
-      <div class="toolbar">
+      <div class="toolbar" id="legacyPathControls">
         <button id="path1">Path 1</button>
         <button id="path2">Path 2</button>
         <button id="path3">Path 3</button>
         <button id="path4">Path 4</button>
+      </div>
+
+      <div id="segmentControls" hidden>
+        <label for="segmentSelect">Segments in selected path</label>
+        <select id="segmentSelect" aria-label="Active segment"></select>
+        <div class="toolbar" style="margin-top:8px">
+          <button id="segmentUp">Move segment up</button>
+          <button id="segmentDown">Move segment down</button>
+        </div>
+        <label for="segmentName">Segment label</label>
+        <input id="segmentName" type="text" maxlength="120" placeholder="Collect samples" />
+        <label for="segmentHeadingMode">Heading mode for all connections in this segment</label>
+        <select id="segmentHeadingMode">
+          <option value="linear">Linear</option>
+          <option value="tangent">Tangent</option>
+          <option value="constant">Constant (destination heading)</option>
+          <option value="mixed" disabled>Mixed — choose a mode to apply to all</option>
+        </select>
+        <div class="toolbar" style="margin-top:8px">
+          <button id="addSegment">New segment</button>
+          <button id="splitSegment">Split at selected point</button>
+          <button id="pointAsSegment" title="Insert a segment at the selected anchor without changing point order. Points after an interior anchor continue in a separate segment.">Make selected point a segment</button>
+          <button id="deleteSegment">Remove segment label</button>
+        </div>
+        <label for="pointHeadingMode">Selected point's incoming heading mode</label>
+        <select id="pointHeadingMode">
+          <option value="linear">Linear</option>
+          <option value="tangent">Tangent</option>
+          <option value="constant">Constant (destination heading)</option>
+        </select>
+        <p class="small">Linear blends the endpoint headings. Tangent faces along the path. Constant holds the destination point's heading for the entire connection.</p>
+        <label for="pointSegmentTarget">Move selected point to segment</label>
+        <select id="pointSegmentTarget" aria-label="Destination segment"></select>
+        <button id="movePointSegment" style="margin-top:8px">Move selected point</button>
+        <p id="pointMoveStatus" class="small" aria-live="polite"></p>
+        <p id="segmentStatus" class="small" aria-live="polite"></p>
+        <p class="small">Press N to add points to the selected segment. Split at an interior anchor to label parts of this path. Reorder segments with the up/down buttons; each starts at the previous segment's endpoint, keeping the auto's starting pose fixed. Select an anchor on the field or in the table to move it to another segment; it appends with its control points. Export creates one Java class for the selected path only. Removing a label keeps its points in the neighboring segment.</p>
       </div>
 
       <div class="list" style="margin-top:8px">
@@ -157,6 +193,7 @@
               <th id="thY">Y left (+)</th>
               <th>θ deg</th>
               <th>Controls</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody id="pointRows"></tbody>
@@ -169,16 +206,19 @@
         <div>
           <label>Java class</label>
           <select id="javaType">
-            <option value="rr">com.acmerobotics.roadrunner.geometry.Pose2d</option>
+            <option value="rr">com.acmerobotics.roadrunner.Pose2d</option>
             <option value="ftclib">com.arcrobotics.ftclib.geometry.Pose2d</option>
             <option value="RilLib">org.firstinspires.ftc.teamcode.RilLib.Math.Geometry.Pose2d;</option>
+            <option value="pedro">Pedro Pathing (PoseFactory)</option>
           </select>
         </div>
         <div>
           <label>Format</label>
           <select id="exportKind">
-            <option value="list">List&lt;Pose2d&gt;</option>
-            <option value="array">Pose2d[]</option>
+            <option value="list">Pose list</option>
+            <option value="array">Pose array</option>
+            <option value="posefactory">Pedro named segments (PoseFactory)</option>
+            <option value="pathchain">Pedro PathChain</option>
           </select>
         </div>
       </div>
@@ -200,8 +240,9 @@
       </div>
 
       <div>
-        <label>Package (for Java class)</label>
-        <input id="packageName" type="text" value="org.firstinspires.ftc.teamcode.auto.paths" />
+        <label>Java folder path (sets Java package)</label>
+        <input id="exportFolderPath" type="text"
+          placeholder="org\firstinspires\ftc\teamcode\opmodes\autos\paths" />
       </div>
 
       <div class="toolbar" style="margin-top:8px">
@@ -213,11 +254,6 @@
 
       <label style="margin-top:10px">Output</label>
       <code id="output"></code>
-      <div class="small" style="margin-top:6px">
-        Tip: use “Choose folder…” and select your repo directory, e.g.
-        <code>TeamCode/src/main/java/org/firstinspires/ftc/teamcode/auto/paths</code>,
-        then “Save to file…” writes directly there.
-      </div>
     </div>
 
     <!-- RIGHT: Canvas (stays fixed; no scroll) -->
@@ -230,6 +266,18 @@
       </div>
       <div class="canvasWrap" id="dropZone" title="Drop an image here">
         <canvas id="canvas"></canvas>
+      </div>
+      <div class="exclusion-controls">
+        <label for="exclusionOutput">Exclusion zone — drag across empty field space to draw a box</label>
+        <input id="exclusionOutput" type="text" readonly placeholder="Draw a box to generate new ExclusionZone(...)" />
+        <div class="toolbar">
+          <button id="copyExclusionBtn" disabled>Copy ExclusionZone</button>
+          <button id="clearExclusionBtn">Clear box</button>
+          <label class="exclusion-toggle" for="exclusionEnabled">
+            <input id="exclusionEnabled" type="checkbox" />
+            Draw exclusion zone
+          </label>
+        </div>
       </div>
     </div>
   </div>
