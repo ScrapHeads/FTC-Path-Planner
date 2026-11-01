@@ -10,8 +10,7 @@ export const els = {
   fieldSize: document.getElementById('fieldSize'),
   measurementUnit: document.getElementById('measurementsUnit'),
   originSelect: document.getElementById('originSelect'),
-  axesFtc: document.getElementById('axesFtc'),
-  axesText: document.getElementById('axesText'),
+  coordinateSystem: document.getElementById('coordinateSystem'),
   thX: document.getElementById('thX'),
   thY: document.getElementById('thY'),
 
@@ -37,12 +36,28 @@ export const els = {
   path2Btn: document.getElementById('path2'),
   path3Btn: document.getElementById('path3'),
   path4Btn: document.getElementById('path4'),
+  legacyPathControls: document.getElementById('legacyPathControls'),
+  segmentControls: document.getElementById('segmentControls'),
+  segmentSelect: document.getElementById('segmentSelect'),
+  segmentUp: document.getElementById('segmentUp'),
+  segmentDown: document.getElementById('segmentDown'),
+  pointSegmentTarget: document.getElementById('pointSegmentTarget'),
+  movePointSegment: document.getElementById('movePointSegment'),
+  pointAsSegment: document.getElementById('pointAsSegment'),
+  pointMoveStatus: document.getElementById('pointMoveStatus'),
+  segmentName: document.getElementById('segmentName'),
+  segmentHeadingMode: document.getElementById('segmentHeadingMode'),
+  pointHeadingMode: document.getElementById('pointHeadingMode'),
+  segmentStatus: document.getElementById('segmentStatus'),
+  addSegment: document.getElementById('addSegment'),
+  splitSegment: document.getElementById('splitSegment'),
+  deleteSegment: document.getElementById('deleteSegment'),
 
   // Export UI
   javaType: document.getElementById('javaType'),
   exportKind: document.getElementById('exportKind'),
   exportFileType: document.getElementById('exportFileType'),
-  packageName: document.getElementById('packageName'),
+  exportFolderPath: document.getElementById('exportFolderPath'),
   className: document.getElementById('className'),
   exportBtn: document.getElementById('exportBtn'),
   saveFileBtn: document.getElementById('saveFileBtn'),
@@ -57,39 +72,27 @@ export const els = {
   boxRotate: document.getElementById('boxRotate'),
 };
 
-export function isFtc(){ return !!els.axesFtc?.checked; }
-
 export function updateAxesUI(){
-  if(!els.axesText || !els.thX || !els.thY) return;
-  if(isFtc()){
-    els.axesText.innerHTML = 'Axes toggle: <b>X+ forward</b>, <b>Y+ left</b>';
+  if(!els.thX || !els.thY) return;
+  const system = els.coordinateSystem?.value || 'ftc';
+  if(system === 'ftc'){
     els.thX.textContent = 'X fwd (+)';
     els.thY.textContent = 'Y left (+)';
+  } else if(system === 'pedro') {
+    els.thX.textContent = 'X right (+)';
+    els.thY.textContent = 'Y up (+)';
   } else {
-    els.axesText.innerHTML = 'Axes toggle: <b>X+ right</b>, <b>Y+ down</b>';
     els.thX.textContent = 'X right (+)';
     els.thY.textContent = 'Y down (+)';
   }
 }
 
 export function getMeasurementUnit() {
-  // Returns the selected measurement unit (e.g., 'm', 'cm', 'in')
-  return els.measurementUnit.value;
+  return els.measurementUnit?.value || 'm';
 }
 
-export function toMeters(value) {
-  // Converts a value from the selected unit to meters
-  const unit = getMeasurementUnit();
-  if (unit === 'cm') return value / 100;
-  if (unit === 'ft') return value * 3.28084;
-  if (unit === 'in') return value * 0.0254;
-  return value; // already meters
+export function isPedroPathingSelected() {
+  return els.javaType?.value === 'pedro';
 }
 
-export function fromMeters(value, targetUnit) {
-  // Converts a value in meters to the target unit
-  if (targetUnit === 'cm') return value * 100;
-  if (targetUnit === 'ft') return value * 3.28084;
-  if (targetUnit === 'in') return value / 0.0254;
-  return value; // already meters
-}
+export { toMeters, fromMeters } from './units.js';

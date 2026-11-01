@@ -1,8 +1,10 @@
+import { headingSettings } from './path_model.js';
+
 // Shared mutable state
 export const PATH_COLORS = ['#666666', '#FD3DB5', '#81c784', '#ffb74d']; // silver, magenta, green, orange
 
 export const state = {
-  // Up to 4 path objects, each with its own metadata and points
+  // Four independent autonomous programs. Each path owns its Pedro segment labels.
   paths: [
     {
       name: "Path 1",
@@ -37,11 +39,28 @@ export const state = {
 
   img: new Image(),
   imgLoaded: false,
+  imageSource: null,
+  exclusionBox: null,
+
+  fieldConfig: {
+    presetId: '',
+    measurementUnit: 'm',
+    fieldWidthM: 3.66,
+    fieldHeightM: 3.66,
+    origin: 'center',
+    coordinateSystem: 'ftc'
+  },
+  robotDimensions: {
+    lengthM: 0.4572,
+    widthM: 0.4572
+  },
 
   selected: -1,
+  selectedControl: null,
   lastMouse: { x:0, y:0 },
   dragMode: null,
   chosenDirHandle: null,
+  chosenDirPath: '',
 
   // Heading wrapping (off = 0..360 / 0..2π, on = ±180 / ±π)
   headingWrapHalf: false,
@@ -58,6 +77,7 @@ export const state = {
 
   // Mini HUD
   hudVisible: true,
+  dimFuture: true,
 
   // Hover label
   hoverActive: false,
@@ -92,14 +112,24 @@ function snapshot(){
     paths: state.paths.map(path => ({
       name: path.name,
       color: path.color,
+      className: path.className,
+      segments: path.segments?.map(segment => ({ ...segment })),
+      activeSegment: path.activeSegment,
       points: path.points.map(p => ({
-        xPx:+p.xPx, yPx:+p.yPx, headingRad:+p.headingRad, locked: !!p.locked
+        xPx:+p.xPx, yPx:+p.yPx, headingRad:+p.headingRad, locked: !!p.locked,
+        segmentId: p.segmentId, breakBefore: p.breakBefore,
+        ...headingSettings(p),
+        controlPoints: (p.controlPoints || []).map(control => ({
+          xPx: +control.xPx, yPx: +control.yPx, locked: !!control.locked
+        }))
       })),
       previewEnabled: !!path.previewEnabled,
       previewIndex: path.previewIndex
     })),
     activePath: state.activePath,
-    headingWrapHalf: state.headingWrapHalf
+    headingWrapHalf: state.headingWrapHalf,
+    fieldConfig: { ...state.fieldConfig },
+    robotDimensions: { ...state.robotDimensions }
   };
 }
 
@@ -107,15 +137,26 @@ function restore(snap){
   state.paths = snap.paths.map(path => ({
     name: path.name,
     color: path.color,
+    className: path.className,
+    segments: path.segments?.map(segment => ({ ...segment })),
+    activeSegment: path.activeSegment,
     points: path.points.map(p => ({
-      xPx:+p.xPx, yPx:+p.yPx, headingRad:+p.headingRad, locked: !!p.locked
+      xPx:+p.xPx, yPx:+p.yPx, headingRad:+p.headingRad, locked: !!p.locked,
+      segmentId: p.segmentId, breakBefore: p.breakBefore,
+      ...headingSettings(p),
+      controlPoints: (p.controlPoints || []).map(control => ({
+        xPx: +control.xPx, yPx: +control.yPx, locked: !!control.locked
+      }))
     })),
     previewEnabled: !!path.previewEnabled,
     previewIndex: path.previewIndex
   }));
   state.activePath = Math.max(0, Math.min(snap.activePath ?? 0, state.paths.length - 1));
   state.selected = -1;
+  state.selectedControl = null;
   state.headingWrapHalf = !!snap.headingWrapHalf;
+  if (snap.fieldConfig) state.fieldConfig = { ...snap.fieldConfig };
+  if (snap.robotDimensions) state.robotDimensions = { ...snap.robotDimensions };
 }
 
 export function pushHistory(){
