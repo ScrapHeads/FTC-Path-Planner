@@ -8,12 +8,12 @@ import {
 } from './coordinates.js';
 
 export function setCanvasSize() {
-  const wrap = canvas.parentElement;
-  const w = wrap.clientWidth;
-  const h = wrap.clientHeight;
+  const rect = canvas.getBoundingClientRect();
   const dpi = window.devicePixelRatio || 1;
-  canvas.width = Math.max(320, Math.floor(w * dpi));
-  canvas.height = Math.max(240, Math.floor(h * dpi));
+  const width = Math.max(1, Math.round(rect.width * dpi));
+  const height = Math.max(1, Math.round(rect.height * dpi));
+  if (canvas.width !== width) canvas.width = width;
+  if (canvas.height !== height) canvas.height = height;
 }
 
 export function getFieldDimensions(unit = state.fieldConfig.measurementUnit) {
@@ -30,7 +30,21 @@ export function pxPerFieldSize() {
   return state.img.width / width;
 }
 
+let frameLayout = null;
+
+// All coordinate conversions in a draw share a single DOM measurement.
+export function withCanvasLayout(render) {
+  const previous = frameLayout;
+  frameLayout = calculateLayout();
+  try { return render(frameLayout); }
+  finally { frameLayout = previous; }
+}
+
 export function layout() {
+  return frameLayout || calculateLayout();
+}
+
+function calculateLayout() {
   const cw = canvas.width;
   const ch = canvas.height;
   if (!state.imgLoaded) {
@@ -41,12 +55,17 @@ export function layout() {
 
   const iw = state.img.width;
   const ih = state.img.height;
-  const scale = Math.min(cw / iw, ch / ih) * 0.98;
-  const w = iw * scale;
-  const h = ih * scale;
+  // Fit in CSS pixels, then convert each axis into backing-buffer pixels.
+  // This also corrects fractional layout sizes and device-pixel rounding.
+  const rect = canvas.getBoundingClientRect?.();
+  const displayWidth = rect?.width || cw;
+  const displayHeight = rect?.height || ch;
+  const scale = Math.min(displayWidth / iw, displayHeight / ih) * 0.98;
+  const w = iw * scale * cw / displayWidth;
+  const h = ih * scale * ch / displayHeight;
   return {
     imgRect: { x: (cw - w) / 2, y: (ch - h) / 2, w, h },
-    imgToCanvas: scale
+    imgToCanvas: scale * cw / displayWidth
   };
 }
 

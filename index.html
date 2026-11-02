@@ -267,18 +267,34 @@
       <div class="canvasWrap" id="dropZone" title="Drop an image here">
         <canvas id="canvas"></canvas>
       </div>
-      <div class="exclusion-controls">
-        <label for="exclusionOutput">Exclusion zone — drag across empty field space to draw a box</label>
-        <input id="exclusionOutput" type="text" readonly placeholder="Draw a box to generate new ExclusionZone(...)" />
+      <details class="exclusion-controls" id="exclusionPanel" open>
+        <summary>
+          <span class="exclusion-panel-heading">Exclusion zone — drag across empty field space to draw a box <span id="exclusionSummaryStatus" class="small"></span></span>
+          <span class="exclusion-panel-symbol" aria-hidden="true"></span>
+        </summary>
+        <input id="exclusionOutput" type="text" readonly aria-label="Exclusion zone Java constructors" placeholder="Draw a box to generate new ExclusionZone(...)" />
         <div class="toolbar">
           <button id="copyExclusionBtn" disabled>Copy ExclusionZone</button>
-          <button id="clearExclusionBtn">Clear box</button>
+          <button id="addExclusionBtn">Add zone</button>
+          <button id="clearExclusionBtn">Delete all zones</button>
+          <button id="resetExclusionBtn">Reset Bio Buzz defaults</button>
           <label class="exclusion-toggle" for="exclusionEnabled">
             <input id="exclusionEnabled" type="checkbox" />
             Draw exclusion zone
           </label>
         </div>
-      </div>
+        <div class="toolbar zone-settings">
+          <label class="exclusion-toggle"><input id="collisionEnabled" type="checkbox" checked />Check collisions</label>
+          <label class="exclusion-toggle"><input id="exportExclusionZones" type="checkbox" />Include zones in export</label>
+          <label>Clearance (in)<input id="zoneMargin" type="number" min="0" max="144" step="0.1" value="0" /></label>
+        </div>
+        <p id="collisionStatus" class="small" aria-live="polite"></p>
+        <details class="zone-list-panel" open>
+          <summary>Shared field zones — coordinates in Pedro inches</summary>
+          <div id="exclusionZoneList"></div>
+        </details>
+        <a href="java/org/firstinspires/ftc/teamcode/util/ExclusionZone.java" download>Download custom ExclusionZone.java</a>
+      </details>
     </div>
   </div>
 

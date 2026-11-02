@@ -80,8 +80,19 @@ export function removeAnchor(path, index) {
 }
 
 export function evaluateBezier(start, controls, end, t) {
-  let level = [start, ...(controls || []), end].map(point => ({ x: point.xPx, y: point.yPx }));
   const clampedT = Math.max(0, Math.min(1, Number(t) || 0));
+  const u = 1 - clampedT;
+  if (!controls?.length) return { x: u * start.xPx + clampedT * end.xPx, y: u * start.yPx + clampedT * end.yPx };
+  if (controls.length === 1) {
+    const a = u * u, b = 2 * u * clampedT, c = clampedT * clampedT;
+    return { x: a * start.xPx + b * controls[0].xPx + c * end.xPx, y: a * start.yPx + b * controls[0].yPx + c * end.yPx };
+  }
+  if (controls.length === 2) {
+    const a = u ** 3, b = 3 * u * u * clampedT, c = 3 * u * clampedT * clampedT, d = clampedT ** 3;
+    return { x: a * start.xPx + b * controls[0].xPx + c * controls[1].xPx + d * end.xPx,
+      y: a * start.yPx + b * controls[0].yPx + c * controls[1].yPx + d * end.yPx };
+  }
+  let level = [start, ...controls, end].map(point => ({ x: point.xPx, y: point.yPx }));
   while (level.length > 1) {
     const next = [];
     for (let i = 0; i < level.length - 1; i++) {

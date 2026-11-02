@@ -22,8 +22,22 @@ import { canonicalToHeading, syncConfigUI } from './field_config.js';
 import { fromMeters, toMeters } from './units.js';
 import { createAnchor, removeAnchor, removeControlPoint, MAX_PATH_POINTS } from './path_model.js';
 import { addPathSegment, ensurePathSegments, getSegmentPoints, pointInsertionIndex } from './segment_model.js';
-import { updateTable, syncSelectedUI } from './ui.js';
-import { startExclusionBox, moveExclusionBox, isExclusionDrawingEnabled } from './exclusion_zone.js';
+import { updateTable, syncSelectedUI, refreshDraggedRow } from './ui.js';
+import { startExclusionBox, moveExclusionBox, finishExclusionBox, isExclusionDrawingEnabled } from './exclusion_zone.js';
+
+let pendingDragFrame = null;
+function renderDragFrame() {
+  pendingDragFrame = null;
+  if (!state.dragMode) return;
+  syncSelectedUI();
+  refreshDraggedRow();
+  draw({ updateExport: false });
+}
+function scheduleDragFrame() {
+  if (pendingDragFrame !== null) return;
+  if (typeof requestAnimationFrame === 'function') pendingDragFrame = requestAnimationFrame(renderDragFrame);
+  else renderDragFrame();
+}
 
 export function initInteractions() {
   canvas.addEventListener('mousedown', event => {
@@ -85,7 +99,7 @@ export function initInteractions() {
     if (!state.dragMode) return;
     if (state.dragMode === 'exclusion-box') {
       moveExclusionBox(mouse);
-      draw();
+      scheduleDragFrame();
       return;
     }
 
@@ -114,9 +128,7 @@ export function initInteractions() {
       point.headingRad = normalize(heading);
     }
 
-    syncSelectedUI();
-    updateTable();
-    draw();
+    scheduleDragFrame();
   });
 
   window.addEventListener('mouseleave', () => {
@@ -127,11 +139,17 @@ export function initInteractions() {
   });
 
   window.addEventListener('mouseup', event => {
+    const wasDragging = !!state.dragMode;
+    if (pendingDragFrame !== null) {
+      cancelAnimationFrame(pendingDragFrame);
+      pendingDragFrame = null;
+    }
     if (state.dragMode === 'exclusion-box') {
       moveExclusionBox(mousePos(event));
-      draw();
+      finishExclusionBox();
     }
     state.dragMode = null;
+    if (wasDragging) { syncSelectedUI(); updateTable(); draw(); }
   });
 
   window.addEventListener('keydown', event => {
@@ -321,8 +339,9 @@ function getDraggedImagePoint(canvasPoint, snap) {
 
 function mousePos(event) {
   const rect = canvas.getBoundingClientRect();
-  const dpi = window.devicePixelRatio || 1;
-  return { x: (event.clientX - rect.left) * dpi, y: (event.clientY - rect.top) * dpi };
+  const scaleX = rect.width ? canvas.width / rect.width : window.devicePixelRatio || 1;
+  const scaleY = rect.height ? canvas.height / rect.height : window.devicePixelRatio || 1;
+  return { x: (event.clientX - rect.left) * scaleX, y: (event.clientY - rect.top) * scaleY };
 }
 
 function pointWithinImage(point, imgRect) {
@@ -331,15 +350,16 @@ function pointWithinImage(point, imgRect) {
 }
 
 function handleHoverIdle(mouse) {
+  const wasVisible = state.hoverActive;
   state.hoverPos = mouse;
   state.hoverActive = false;
   if (state._hoverTimer) clearTimeout(state._hoverTimer);
+  if (state.dragMode) return;
   const { imgRect } = layout();
+  if (wasVisible) draw();
   if (!state.imgLoaded || !pointWithinImage(mouse, imgRect)) {
-    draw();
     return;
   }
-  draw();
   state._hoverTimer = setTimeout(() => {
     state.hoverActive = true;
     draw();

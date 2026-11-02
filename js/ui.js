@@ -24,6 +24,7 @@ import { addControlPoint, removeAnchor, removeControlPoint, MAX_PATH_POINTS, get
 import { addPathSegment, canRemovePathSegment, canSplitPathSegment, ensurePathSegments, getSegmentPoints, removePathSegment, segmentMethodNames, splitPathSegment } from './segment_model.js';
 import { transformFieldPose } from './coordinates.js';
 import { planSegmentReorder, planPointMove, planPointAsSegment } from './segment_model.js';
+import { collisionReport } from './collision_state.js';
 
 let refreshPreviewUI = () => {};
 
@@ -94,7 +95,7 @@ export function initUI() {
 
   const updateRobot = () => {
     setRobotDimensionsFromDisplay(els.robotLen.value, els.robotWid.value);
-    draw();
+    refreshAll();
   };
   els.robotLen.addEventListener('change', updateRobot);
   els.robotWid.addEventListener('change', updateRobot);
@@ -248,6 +249,14 @@ export function refreshSegmentControls() {
     const option = document.createElement('option');
     option.value = String(index);
     option.textContent = `${segment.name} (${getSegmentPoints(path, segment.id).length} points)`;
+    const report = collisionReport().paths[state.activePath];
+    if (getSegmentPoints(path, segment.id).some(point => {
+      const pointIndex = path.points.indexOf(point);
+      return report.anchors[pointIndex]?.length || (point.segmentId === segment.id && report.connections[pointIndex]?.length);
+    })) {
+      option.textContent += ' — collision';
+      if (option.style) option.style.color = '#ef4444';
+    }
     return option;
   }));
   els.segmentSelect.value = String(path.activeSegment);
@@ -399,11 +408,17 @@ export function updateTable() {
   const segments = controlsEnabled ? ensurePathSegments(path) : null;
   const segment = segments?.[path.activeSegment];
   const activePoints = segment ? new Set(getSegmentPoints(path, segment.id)) : null;
+  const collision = collisionReport().paths[state.activePath];
 
   path.points.forEach((point, pointIndex) => {
     point.controlPoints ||= [];
     const field = imagePxToField(point.xPx, point.yPx);
     const row = document.createElement('tr');
+    const zoneIds = new Set([...(collision.anchors[pointIndex] || []), ...(collision.connections[pointIndex] || []).map(hit => hit.zoneId)]);
+    if (zoneIds.size) {
+      row.classList.add('collision-row');
+      row.title = `Collision: ${[...zoneIds].map(id => state.exclusionZones.find(zone => zone.id === id)?.name || id).join(', ')}`;
+    }
     if (activePoints?.has(point)) row.classList.add('active-segment-row');
     else if (activePoints) row.classList.add('dimmed-segment-row');
     if (pointIndex === state.selected && !state.selectedControl) row.classList.add('selected-row');
@@ -510,6 +525,30 @@ function bindTableActions(path) {
   els.pointRows.querySelectorAll('.move-down').forEach(button => {
     button.addEventListener('click', () => moveAnchor(path, Number(button.dataset.point), 1));
   });
+}
+
+// Coordinate cells can update without rebuilding every row and event listener.
+export function refreshDraggedRow() {
+  if (!els.pointRows.querySelector) return;
+  const path = state.paths[state.activePath];
+  const pointIndex = state.selectedControl?.pointIndex ?? state.selected;
+  const point = path.points[pointIndex];
+  if (!point) return;
+  const selection = state.selectedControl;
+  const entity = selection ? point.controlPoints[selection.controlIndex] : point;
+  const button = selection
+    ? els.pointRows.querySelector(`.select-control[data-point="${pointIndex}"][data-control="${selection.controlIndex}"]`)
+    : els.pointRows.querySelector(`.select-anchor[data-point="${pointIndex}"]`);
+  const cells = button?.closest('tr')?.cells;
+  if (!cells || !entity) return;
+  const field = imagePxToField(entity.xPx, entity.yPx);
+  const x = field.x.toFixed(2), y = field.y.toFixed(2);
+  if (cells[1].textContent !== x) cells[1].textContent = x;
+  if (cells[2].textContent !== y) cells[2].textContent = y;
+  if (!selection) {
+    const heading = `${formatDeg(point.headingRad).toFixed(1)}${isPedroPathingSelected() && pointIndex > 0 && !point.breakBefore ? `<br><small>${getHeadingMode(point)}</small>` : ''}`;
+    if (cells[3].innerHTML !== heading) cells[3].innerHTML = heading;
+  }
 }
 
 export function syncSelectedUI() {

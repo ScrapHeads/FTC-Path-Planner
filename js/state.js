@@ -41,6 +41,9 @@ export const state = {
   imgLoaded: false,
   imageSource: null,
   exclusionBox: null,
+  exclusionPanelOpen: true,
+  exclusionZones: [],
+  exclusionSettings: { checkingEnabled: true, exportEnabled: false, marginIn: 0, biobuzzInitialized: false },
 
   fieldConfig: {
     presetId: '',
@@ -129,7 +132,9 @@ function snapshot(){
     activePath: state.activePath,
     headingWrapHalf: state.headingWrapHalf,
     fieldConfig: { ...state.fieldConfig },
-    robotDimensions: { ...state.robotDimensions }
+    robotDimensions: { ...state.robotDimensions },
+    exclusionZones: state.exclusionZones.map(zone => ({ ...zone })),
+    exclusionSettings: { ...state.exclusionSettings }
   };
 }
 
@@ -157,6 +162,9 @@ function restore(snap){
   state.headingWrapHalf = !!snap.headingWrapHalf;
   if (snap.fieldConfig) state.fieldConfig = { ...snap.fieldConfig };
   if (snap.robotDimensions) state.robotDimensions = { ...snap.robotDimensions };
+  if (snap.exclusionZones) state.exclusionZones = snap.exclusionZones.map(zone => ({ ...zone }));
+  if (snap.exclusionSettings) state.exclusionSettings = { ...snap.exclusionSettings };
+  state.exclusionBox = null;
 }
 
 export function pushHistory(){

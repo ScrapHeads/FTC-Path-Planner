@@ -6,6 +6,7 @@ import { normalize, sanitizeJavaIdent, sanitizeFileBase, mimeForName, wrapRadFul
 import { buildPedroJavaSegments, PEDRO_IMPORTS } from './pedro_java.js';
 import { MAX_PATH_POINTS, getHeadingMode, headingSettings } from './path_model.js';
 import { saveExport } from './io_save.js';
+import { zoneDocument, buildJavaZones } from './exclusion_model.js';
 import { ensurePathSegments, getSegmentPoints, samePose } from './segment_model.js';
 import {
   javaPackageFromDirectoryHandle,
@@ -248,10 +249,11 @@ export function buildExportArtifacts(pathData, config) {
   const javaBody = config.format === 'pathchain'
     ? buildPedroPathChain(pathData, config.fileType === 'java-class')
     : buildPoseCollection(pathData, config, javaConfig);
-  const imports = javaConfig.imports.map(name => `import ${name};`).join('\n');
+  const imports = [...javaConfig.imports, ...(metadata.exclusionZones ? ['org.firstinspires.ftc.teamcode.util.ExclusionZone'] : [])].map(name => `import ${name};`).join('\n');
+  const zoneBody = metadata.exclusionZones ? `${buildJavaZones(state.exclusionZones)}\n\n` : '';
 
   if (config.fileType === 'java-snippet') {
-    const content = `${plannerComments}\n${imports}\n\n${javaBody}\n`;
+    const content = `${plannerComments}\n${imports}\n\n${zoneBody}${javaBody}\n`;
     return { content, preview: content, suggestedName: `${fileBase}.java.txt` };
   }
 
@@ -259,7 +261,7 @@ export function buildExportArtifacts(pathData, config) {
   const content = `${packageLine}${plannerComments}\n${imports}\n\npublic final class ${className} {
     private ${className}() {}
 
-${indent(javaBody, 4)}
+${indent(zoneBody + javaBody, 4)}
 }
 `;
   return { content, preview: content, suggestedName: `${className}.java` };
@@ -298,8 +300,9 @@ function buildSegmentExport(segments, config) {
     return { content, preview: content, suggestedName: `${fileBase}.csv` };
   }
   const comments = metadataCommentLines(metadata, '// ').join('\n');
-  const imports = PEDRO_IMPORTS.map(name => `import ${name};`).join('\n');
-  const body = buildPedroJavaSegments(segments);
+  const zoneExport = metadata.exclusionZones !== undefined;
+  const imports = [...PEDRO_IMPORTS, ...(zoneExport ? ['org.firstinspires.ftc.teamcode.util.ExclusionZone'] : [])].map(name => `import ${name};`).join('\n');
+  const body = `${zoneExport ? `${buildJavaZones(state.exclusionZones)}\n\n` : ''}${buildPedroJavaSegments(segments)}`;
   if (config.fileType === 'java-snippet') {
     const content = `${comments}\n${imports}\n\n${body}\n`;
     return { content, preview: content, suggestedName: `${fileBase}.java.txt` };
@@ -411,6 +414,7 @@ function buildMetadata(config) {
   const pedro = config.library === 'pedro' || config.format === 'pathchain';
   return {
     schemaVersion: config.format === 'posefactory' ? 3 : 2,
+    ...(state.exclusionSettings.exportEnabled ? { exclusionZones: zoneDocument(state.exclusionZones, state.exclusionSettings) } : {}),
     ...(config.format === 'posefactory' ? { className: sanitizeJavaIdent(config.className || 'AutoPath') } : {}),
     library: config.library,
     format: config.format,
@@ -439,8 +443,9 @@ function buildPlannerDataComments(pathData, metadata) {
 
 function metadataCommentLines(metadata, prefix) {
   const compactConfig = findCompactConfig(metadata);
-  if (compactConfig) return [`${prefix}config=${compactConfig}`];
-  return Object.entries(metadata).map(([key, value]) => `${prefix}${key}=${value}`);
+  const zoneLine = metadata.exclusionZones ? [`${prefix}exclusionZones=${JSON.stringify(metadata.exclusionZones)}`] : [];
+  if (compactConfig) return [`${prefix}config=${compactConfig}`, ...zoneLine];
+  return Object.entries(metadata).filter(([key]) => key !== 'exclusionZones').map(([key, value]) => `${prefix}${key}=${value}`).concat(zoneLine);
 }
 
 function formatHeadingRad(heading) {

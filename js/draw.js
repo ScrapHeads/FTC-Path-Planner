@@ -1,33 +1,36 @@
 import { ctx, dpi, els, getMeasurementUnit, isPedroPathingSelected } from './els.js';
 import { state, PATH_COLORS } from './state.js';
-import { layout, imagePxToCanvas, pxToField, headingToCanvasAngle } from './layout.js';
+import { layout, withCanvasLayout, imagePxToCanvas, pxToField, headingToCanvasAngle } from './layout.js';
 import { doExport } from './io_export.js';
-import { sampleSegment } from './path_model.js';
+import { sampleSegment, evaluateBezier } from './path_model.js';
 import { ensurePathSegments, getSegmentPoints } from './segment_model.js';
 import { drawExclusionBox } from './exclusion_zone.js';
+import { collisionReport } from './collision_state.js';
 
-export function draw() {
+export function draw(options = {}) {
   try {
-    const { imgRect } = layout();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    drawGrid();
+    withCanvasLayout(({ imgRect }) => {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      drawGrid();
 
-    if (state.imgLoaded) {
-      ctx.drawImage(state.img, imgRect.x, imgRect.y, imgRect.w, imgRect.h);
-      drawPathsAndPoints();
-      drawHoverLabel();
-    } else {
-      ctx.fillStyle = '#101820';
-      ctx.fillRect(imgRect.x, imgRect.y, imgRect.w, imgRect.h);
-      ctx.fillStyle = '#789';
-      ctx.font = `${14 * dpi}px sans-serif`;
-      ctx.fillText('Load a field image', imgRect.x + 16, imgRect.y + 28);
-    }
+      if (state.imgLoaded) {
+        ctx.drawImage(state.img, imgRect.x, imgRect.y, imgRect.w, imgRect.h);
+        drawExclusionBox();
+        drawPathsAndPoints();
+        drawHoverLabel();
+      } else {
+        ctx.fillStyle = '#101820';
+        ctx.fillRect(imgRect.x, imgRect.y, imgRect.w, imgRect.h);
+        ctx.fillStyle = '#789';
+        ctx.font = `${14 * dpi}px sans-serif`;
+        ctx.fillText('Load a field image', imgRect.x + 16, imgRect.y + 28);
+      }
 
-    drawExclusionBox();
-    if (state.hudVisible) drawHUD();
-    doExport();
+      if (!state.imgLoaded) drawExclusionBox();
+      if (state.hudVisible) drawHUD();
+      if (options.updateExport ?? !state.dragMode) doExport();
+    });
   } catch (error) {
     console.error('Render error', error);
   }
@@ -48,7 +51,9 @@ function drawPathsAndPoints() {
   const activePath = state.paths[state.activePath];
   const selectedSegment = controlsEnabled ? ensurePathSegments(activePath)[activePath.activeSegment] : null;
   const focusedPoints = selectedSegment ? new Set(getSegmentPoints(activePath, selectedSegment.id)) : null;
+  const reports = collisionReport().paths;
   state.paths.forEach((path, pathIndex) => {
+    const collisions = reports[pathIndex];
     const visibleCount = path.previewEnabled
       ? Math.max(0, Math.min(path.points.length, path.previewIndex + 1))
       : path.points.length;
@@ -58,13 +63,14 @@ function drawPathsAndPoints() {
       const outsideSegment = focusedPoints && (pathIndex !== state.activePath || path.points[endIndex].segmentId !== selectedSegment.id);
       const dimmed = endIndex >= visibleCount || outsideSegment;
       drawSegment(path.points[endIndex - 1], path.points[endIndex], path.color, dimmed, controlsEnabled);
+      if (collisions.connections[endIndex]) drawCollisionIntervals(path.points[endIndex - 1], path.points[endIndex], collisions.connections[endIndex], controlsEnabled);
       if (controlsEnabled && pathIndex === state.activePath) drawControlPolygon(path, endIndex, dimmed);
     }
 
     path.points.forEach((point, pointIndex) => {
       const outsideSegment = focusedPoints && (pathIndex !== state.activePath || !focusedPoints.has(point));
       const future = pointIndex >= visibleCount;
-      drawAnchor(path, pathIndex, point, pointIndex, future || outsideSegment);
+      drawAnchor(path, pathIndex, point, pointIndex, future || outsideSegment, collisions.anchors[pointIndex]?.length > 0, collisions.headings[pointIndex]);
       if (controlsEnabled && pathIndex === state.activePath) {
         // Controls belong to the incoming connection, including at shared anchors.
         drawControls(path, pointIndex, future || (selectedSegment && point.segmentId !== selectedSegment.id));
@@ -73,9 +79,20 @@ function drawPathsAndPoints() {
   });
 }
 
+const geometryCache = new WeakMap();
+function segmentGeometry(start, end, controlsEnabled) {
+  const controls = controlsEnabled ? end.controlPoints || [] : [];
+  const key = [start.xPx, start.yPx, end.xPx, end.yPx, ...controls.flatMap(control => [control.xPx, control.yPx])].join(',');
+  let geometry = geometryCache.get(end);
+  if (!geometry || geometry.key !== key) {
+    geometry = { key, controls, samples: sampleSegment(start, { ...end, controlPoints: controls }, controls.length ? 48 : 1) };
+    geometryCache.set(end, geometry);
+  }
+  return geometry;
+}
+
 function drawSegment(start, end, color, isFuture, controlsEnabled) {
-  const segmentEnd = controlsEnabled ? end : { ...end, controlPoints: [] };
-  const samples = sampleSegment(start, segmentEnd, controlsEnabled && end.controlPoints?.length ? 48 : 1);
+  const { samples } = segmentGeometry(start, end, controlsEnabled);
   ctx.save();
   ctx.strokeStyle = isFuture ? 'rgba(148, 163, 184, 0.45)' : color;
   ctx.lineWidth = 3 * dpi;
@@ -130,16 +147,43 @@ function drawControls(path, pointIndex, isFuture) {
   });
 }
 
-function drawAnchor(path, pathIndex, point, pointIndex, isFuture) {
+function drawCollisionIntervals(start, end, intervals, controlsEnabled) {
+  const geometry = segmentGeometry(start, end, controlsEnabled);
+  if (geometry.intervals !== intervals) {
+    geometry.intervals = intervals;
+    // Overlapping enabled zones may report the same interval. Draw their union.
+    const merged = [];
+    for (const interval of [...intervals].sort((a, b) => a.from - b.from)) {
+      const last = merged.at(-1);
+      if (last && interval.from <= last.to) last.to = Math.max(last.to, interval.to);
+      else merged.push({ from: interval.from, to: interval.to });
+    }
+    geometry.collisionLines = merged.map(interval => {
+      const steps = Math.max(1, Math.ceil((interval.to - interval.from) * 128));
+      return Array.from({ length: steps + 1 }, (_, index) => evaluateBezier(start, geometry.controls, end,
+        interval.from + (interval.to - interval.from) * index / steps));
+    });
+  }
+  ctx.save(); ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 5 * dpi; ctx.setLineDash([]);
+  for (const points of geometry.collisionLines) {
+    ctx.beginPath();
+    points.forEach((point, index) => { const p = imagePxToCanvas(point.x, point.y); if (!index) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawAnchor(path, pathIndex, point, pointIndex, isFuture, collides = false, expectedHeading) {
   const canvasPoint = imagePxToCanvas(point.xPx, point.yPx);
   const selected = pathIndex === state.activePath && pointIndex === state.selected && !state.selectedControl;
-  const color = path.color || PATH_COLORS[pathIndex] || '#94a3b8';
+  const color = collides ? '#ef4444' : path.color || PATH_COLORS[pathIndex] || '#94a3b8';
   const angle = headingToCanvasAngle(point.headingRad);
 
-  if (!isFuture) drawRobotFootprint(canvasPoint, angle, color, point.locked);
+  const footprintAngle = Number.isFinite(expectedHeading) ? -expectedHeading : angle;
+  if (!isFuture || collides) drawRobotFootprint(canvasPoint, footprintAngle, color, point.locked && !collides, collides);
 
   const radius = 6 * dpi;
-  ctx.fillStyle = isFuture ? 'rgba(226, 232, 240, 0.35)' : (selected ? '#a78bfa' : color);
+  ctx.fillStyle = collides ? '#ef4444' : isFuture ? 'rgba(226, 232, 240, 0.35)' : (selected ? '#a78bfa' : color);
   ctx.beginPath();
   ctx.arc(canvasPoint.x, canvasPoint.y, radius, 0, Math.PI * 2);
   ctx.fill();
@@ -166,7 +210,7 @@ function drawAnchor(path, pathIndex, point, pointIndex, isFuture) {
   ctx.fillText(point.locked ? `L${pointIndex + 1}` : `${pointIndex + 1}`, canvasPoint.x + 8 * dpi, canvasPoint.y - 8 * dpi);
 }
 
-function drawRobotFootprint(canvasPoint, angle, color, locked) {
+function drawRobotFootprint(canvasPoint, angle, color, locked, collides = false) {
   const { imgRect } = layout();
   const metersPerCanvasPixelX = state.fieldConfig.fieldWidthM / imgRect.w;
   const metersPerCanvasPixelY = state.fieldConfig.fieldHeightM / imgRect.h;
@@ -177,7 +221,7 @@ function drawRobotFootprint(canvasPoint, angle, color, locked) {
 
   ctx.save();
   ctx.translate(canvasPoint.x, canvasPoint.y);
-  ctx.rotate(els.boxRotate.checked ? angle : 0);
+  ctx.rotate(collides || els.boxRotate.checked ? angle : 0);
   ctx.globalAlpha = 0.12;
   ctx.fillStyle = locked ? '#f59e0b' : color;
   ctx.fillRect(-length / 2, -width / 2, length, width);

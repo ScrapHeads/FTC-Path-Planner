@@ -1,10 +1,11 @@
 import { state } from './state.js';
+import { normalizeZones } from './exclusion_model.js';
 
 export const STORAGE_KEY = 'ftc-path-planner.workspace.v1';
 const STATE_KEYS = [
   'paths', 'activePath', 'fieldConfig', 'robotDimensions', 'selected',
   'selectedControl', 'headingWrapHalf', 'hudVisible', 'dimFuture',
-  'exclusionBox', 'chosenDirPath', 'imageSource'
+  'exclusionBox', 'exclusionZones', 'exclusionSettings', 'exclusionPanelOpen', 'chosenDirPath', 'imageSource'
 ];
 // Generated table/preview controls are rebuilt from state. File inputs and
 // directory permissions cannot be restored by assigning a form value.
@@ -49,6 +50,7 @@ export function restoreAppState() {
     for (const key of STATE_KEYS) {
       if (Object.hasOwn(saved.workspace, key)) state[key] = saved.workspace[key];
     }
+    if (saved.workspace.exclusionZones) state.exclusionZones = normalizeZones(saved.workspace.exclusionZones);
     return saved;
   } catch (error) {
     // Unavailable storage or an incomplete/corrupt draft must not prevent boot.
@@ -94,6 +96,11 @@ export function initPersistence() {
 function validWorkspace(workspace) {
   if (!workspace || !Array.isArray(workspace.paths) || workspace.paths.length !== 4) return false;
   if (!Number.isInteger(workspace.activePath) || !workspace.paths[workspace.activePath]) return false;
+  try { if (workspace.exclusionZones !== undefined) normalizeZones(workspace.exclusionZones); }
+  catch { return false; }
+  const zoneSettings = workspace.exclusionSettings;
+  if (zoneSettings !== undefined && (!zoneSettings || typeof zoneSettings.checkingEnabled !== 'boolean' ||
+    typeof zoneSettings.exportEnabled !== 'boolean' || !Number.isFinite(zoneSettings.marginIn) || zoneSettings.marginIn < 0 || zoneSettings.marginIn > 144)) return false;
   const validPosition = point => point && Number.isFinite(point.xPx) && Number.isFinite(point.yPx);
   if (!workspace.paths.every(path => path && typeof path.name === 'string' &&
     typeof path.color === 'string' && Array.isArray(path.points) &&
