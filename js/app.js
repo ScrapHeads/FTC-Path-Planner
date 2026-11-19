@@ -1,7 +1,7 @@
 import { els, canvas } from './els.js';
 import { setCanvasSize } from './layout.js';
 import { draw } from './draw.js';
-import { initUI, setActivePath } from './ui.js';
+import { initUI, setActivePath, updateTable } from './ui.js';
 import { initInteractions } from './interactions.js';
 import { initImageIO, loadImage } from './io_image.js';
 import { initExport } from './io_export.js';
@@ -20,7 +20,7 @@ async function boot(){
   initUI();
   initImageIO();
   initInteractions();
-  initExclusionBox(draw);
+  initExclusionBox(() => { updateTable(); draw(); });
   initImport();
   initExport();
   setActivePath(state.activePath, { preserveSelection: true });
@@ -49,5 +49,10 @@ async function boot(){
 }
 
 window.addEventListener('resize', ()=>{ setCanvasSize(); draw(); });
+
+// Panel contents, wrapping text and nested disclosures can resize the field
+// without a window resize. Keep the drawing buffer synchronized in every case.
+const canvasResizeObserver = new ResizeObserver(() => { setCanvasSize(); draw(); });
+canvasResizeObserver.observe(canvas);
 
 boot();

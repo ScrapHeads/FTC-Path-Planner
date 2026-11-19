@@ -286,7 +286,7 @@ test('clicking a field anchor selects its segment from All segments or another s
     assert.equal(document.getElementById('segmentName').value, path.segments[1].name);
     assert.equal(state.selected, 3);
     assert.equal(state.selectedControl, null);
-    assert.equal(state.dragMode, 'move-point');
+    assert.equal(state.dragMode, null);
     assert.equal(drawing.anchors[0], 'rgba(226, 232, 240, 0.35)');
     assert.equal(drawing.anchors[3], '#a78bfa');
     assert.equal(state.paths.length, 2);
@@ -308,7 +308,7 @@ test('clicking a shared anchor retains either selected segment, or chooses its o
   assert.equal(state.selected, 2);
 });
 
-test('clicking a dimmed control selects its incoming segment and preserves control dragging', t => {
+test('a dimmed control selects its incoming segment first and allows dragging on the next press', t => {
   t.mock.method(console, 'error', (...args) => assert.fail(args.join(' ')));
   const path = seedSegmentFocus();
   setActiveSegment(1);
@@ -316,6 +316,8 @@ test('clicking a dimmed control selects its incoming segment and preserves contr
   assert.equal(path.activeSegment, 0);
   assert.equal(document.getElementById('segmentSelect').value, '0');
   assert.deepEqual(state.selectedControl, { pointIndex: 2, controlIndex: 0 });
+  assert.equal(state.dragMode, null);
+  clickFieldPoint(path.points[2].controlPoints[0]);
   assert.equal(state.dragMode, 'move-control');
 });
 
@@ -326,6 +328,8 @@ test('heading handles and locked anchors select their segments without changing 
   clickFieldPoint(path.points[3], true);
   assert.equal(path.activeSegment, 1);
   assert.equal(state.selected, 3);
+  assert.equal(state.dragMode, null);
+  clickFieldPoint(path.points[3], true);
   assert.equal(state.dragMode, 'rotate');
   path.points[4].locked = true;
   setActiveSegment(0);
@@ -344,3 +348,28 @@ test('RoadRunner field selection does not change the stored Pedro segment select
   assert.equal(state.selected, 3);
   assert.equal(path.activeSegment, 0);
 });
+
+for (const entity of ['anchor', 'control', 'handle']) {
+  test(`first ${entity} selection cannot drag or create an undo entry`, t => {
+    t.mock.method(console, 'error', (...args) => assert.fail(args.join(' ')));
+    const path = seedSegmentFocus();
+    setActiveSegment(0);
+    const point = entity === 'control' ? path.points[3].controlPoints[0] : path.points[3];
+    const before = JSON.parse(JSON.stringify(path.points));
+    const historyCount = state._history.length;
+    const position = imagePxToCanvas(point.xPx, point.yPx);
+    const offset = entity === 'handle' ? 28 : 0;
+    clickFieldPoint(point, entity === 'handle');
+    listeners.get('mousemove')({ clientX: position.x + offset + 20, clientY: position.y - 20, shiftKey: false });
+    listeners.get('mouseup')({});
+    assert.equal(state.dragMode, null);
+    assert.equal(state._history.length, historyCount);
+    assert.deepEqual(JSON.parse(JSON.stringify(path.points)), before);
+    clickFieldPoint(point, entity === 'handle');
+    assert.equal(state.dragMode, entity === 'anchor' ? 'move-point' : entity === 'control' ? 'move-control' : 'rotate');
+    listeners.get('mousemove')({ clientX: position.x + offset + 25, clientY: position.y - 25, shiftKey: false });
+    listeners.get('mouseup')({});
+    assert.notDeepEqual(JSON.parse(JSON.stringify(path.points)), before);
+    if (state._hoverTimer) clearTimeout(state._hoverTimer);
+  });
+}

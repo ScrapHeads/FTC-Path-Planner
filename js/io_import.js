@@ -14,6 +14,7 @@ import {
 import { createAnchor, MAX_PATH_POINTS } from './path_model.js';
 import { ensurePathSegments, samePose } from './segment_model.js';
 import { parsePedroJavaSegments } from './pedro_java.js';
+import { parseImportedZones } from './exclusion_model.js';
 
 export function initImport() {
   els.loadBtn.addEventListener('click', () => {
@@ -44,6 +45,28 @@ export function initImport() {
 }
 
 export async function importWaypointsFromText(text, filename = 'path.txt') {
+  const trimmed = text.trim();
+  const extension = filename.split('.').pop()?.toLowerCase();
+  let metadata;
+  let javaText = '';
+  if (extension === 'json' || trimmed.startsWith('{') || trimmed.startsWith('[')) metadata = JSON.parse(text)?.meta || {};
+  else if (extension === 'csv') {
+    metadata = {};
+    for (const line of text.split(/\r?\n/)) if (/^\s*#/.test(line)) parseMetadataLine(line, metadata);
+  } else { metadata = parseJavaMetadata(text); javaText = text; }
+  const imported = parseImportedZones(metadata, javaText);
+  const previousZones = state.exclusionZones, previousSettings = { ...state.exclusionSettings };
+  try { await importPathContents(text, filename); }
+  finally { state.exclusionZones = previousZones; state.exclusionSettings = previousSettings; }
+  if (imported) {
+    state.exclusionZones = imported.zones;
+    Object.assign(state.exclusionSettings, { checkingEnabled: imported.checkingEnabled, marginIn: imported.marginIn, exportEnabled: true, biobuzzInitialized: true });
+  } else if (state.fieldConfig.presetId === 'pedro-biobuzz') {
+    state.exclusionSettings.biobuzzInitialized = true;
+  }
+}
+
+async function importPathContents(text, filename) {
   const trimmed = text.trim();
   const extension = filename.split('.').pop()?.toLowerCase();
   if (extension === 'json' || trimmed.startsWith('{') || trimmed.startsWith('[')) {

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { defaultZones } from '../js/exclusion_model.js';
 
 class FakeElement {
   constructor(id) {
@@ -451,4 +452,63 @@ test('four Pedro autos can be loaded independently, one class and segment set pe
     assert.match(artifact.content, new RegExp(`public final class ${names[index]}`));
     for (const other of names.filter(name => name !== names[index])) assert.ok(!artifact.content.includes(other));
   }
+});
+
+for (const fileType of ['json', 'csv', 'java-class', 'java-snippet']) {
+  test(`optional zones round trip enabled and disabled entries through ${fileType}`, async t => {
+    const previous = { zones: state.exclusionZones, settings: { ...state.exclusionSettings } };
+    t.after(() => { state.exclusionZones = previous.zones; state.exclusionSettings = previous.settings; });
+    seedSegments();
+    const zones = defaultZones(); zones[0].enabled = false;
+    state.exclusionZones = zones;
+    state.exclusionSettings = { checkingEnabled: true, exportEnabled: false, marginIn: 0.5, biobuzzInitialized: true };
+    const excluded = buildExportArtifacts([], segmentConfig(fileType));
+    assert.doesNotMatch(excluded.content, /[Ee]xclusion[Zz]one|EXCLUSION_ZONES/);
+    state.exclusionSettings.exportEnabled = true;
+    const included = buildExportArtifacts([], segmentConfig(fileType));
+    assert.match(included.content, /exclusionZones/);
+    if (fileType.startsWith('java')) {
+      assert.match(included.content, /import org\.firstinspires\.ftc\.teamcode\.util\.ExclusionZone;/);
+      assert.equal((included.content.match(/new ExclusionZone\(/g) || []).length, 1);
+    }
+    state.exclusionZones = [];
+    await importWaypointsFromText(included.content, `Zones.${fileType === 'json' ? 'json' : fileType === 'csv' ? 'csv' : 'java'}`);
+    assert.deepEqual(state.exclusionZones, zones);
+    assert.equal(state.exclusionSettings.marginIn, 0.5);
+    assert.equal(state.exclusionSettings.exportEnabled, true);
+    await importWaypointsFromText(excluded.content, `NoZones.${fileType === 'json' ? 'json' : fileType === 'csv' ? 'csv' : 'java'}`);
+    assert.deepEqual(state.exclusionZones, zones, 'zone-free imports preserve the current field list');
+  });
+}
+
+test('Bio Buzz defaults load once without overwriting edited or intentionally cleared zones', () => {
+  seedSegments();
+  const oldZones = state.exclusionZones, oldSettings = { ...state.exclusionSettings };
+  try {
+    state.exclusionZones = []; state.exclusionSettings.biobuzzInitialized = false;
+    applyPresetConfig('pedro-biobuzz');
+    assert.deepEqual(state.exclusionZones, defaultZones());
+    state.exclusionZones[0].minX = 40;
+    applyPresetConfig('pedro-biobuzz');
+    assert.equal(state.exclusionZones[0].minX, 40);
+    state.exclusionZones = [];
+    applyPresetConfig('pedro-biobuzz');
+    assert.deepEqual(state.exclusionZones, []);
+  } finally { state.exclusionZones = oldZones; state.exclusionSettings = oldSettings; }
+});
+
+test('zone edits and toggles are included in undo/redo snapshots', () => {
+  seedSegments();
+  const oldZones = state.exclusionZones, oldSettings = { ...state.exclusionSettings };
+  try {
+    state.exclusionZones = defaultZones(); state.exclusionSettings.exportEnabled = false;
+    pushHistory();
+    state.exclusionZones[0].enabled = false; state.exclusionSettings.exportEnabled = true;
+    assert.equal(undo(), true);
+    assert.equal(state.exclusionZones[0].enabled, true);
+    assert.equal(state.exclusionSettings.exportEnabled, false);
+    assert.equal(redo(), true);
+    assert.equal(state.exclusionZones[0].enabled, false);
+    assert.equal(state.exclusionSettings.exportEnabled, true);
+  } finally { state.exclusionZones = oldZones; state.exclusionSettings = oldSettings; }
 });

@@ -50,6 +50,8 @@ test('refresh restores all paths, controls, segments, map identity, selection an
   state.selectedControl = { pointIndex: 0, controlIndex: 0 };
   state.imageSource = { kind: 'upload' };
   state.exclusionBox = { start: { x: 20, y: 30 }, end: { x: 90, y: 80 } };
+  state.exclusionZones = [{ id: 'obstacle', name: 'Obstacle', minX: 40, minY: 50, maxX: 45, maxY: 90, enabled: false }];
+  state.exclusionSettings = { checkingEnabled: true, exportEnabled: true, marginIn: 0.5, biobuzzInitialized: true };
   state.fieldConfig = {
     presetId: '', measurementUnit: 'in', fieldWidthM: 3.65,
     fieldHeightM: 3.67, origin: 'bottomLeft', coordinateSystem: 'pedro'

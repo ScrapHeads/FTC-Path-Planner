@@ -2,6 +2,7 @@ import { els } from './els.js';
 import { state } from './state.js';
 import { formatDistance, fromMeters, normalizeUnit, toMeters } from './units.js';
 import { canonicalToHeading, headingToCanonical } from './coordinates.js';
+import { defaultZones } from './exclusion_model.js';
 
 export { canonicalToHeading, headingToCanonical } from './coordinates.js';
 
@@ -122,7 +123,15 @@ export function getPresetSource(value) {
 }
 
 export function initFieldConfigUI() {
+  ensureExclusionDefaults();
   syncConfigUI();
+}
+
+export function ensureExclusionDefaults() {
+  if (state.fieldConfig.presetId === 'pedro-biobuzz' && !state.exclusionSettings.biobuzzInitialized) {
+    if (!state.exclusionZones.length) state.exclusionZones = defaultZones();
+    state.exclusionSettings.biobuzzInitialized = true;
+  }
 }
 
 export function syncConfigUI() {
@@ -210,6 +219,7 @@ export function applyPresetConfig(value) {
     origin: preset.origin,
     coordinateSystem: preset.coordinateSystem
   };
+  ensureExclusionDefaults();
   syncConfigUI();
   return preset;
 }
