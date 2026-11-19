@@ -223,7 +223,8 @@ th,td{padding:8px;border-bottom:1px solid #203040;text-align:left}
 tr:hover{background:#111820}
 .selected-row{background:#172234}
 .active-segment-row{box-shadow:inset 3px 0 var(--accent)}
-.dimmed-segment-row{opacity:.4}
+.dimmed-segment-row>td:not(:last-child){opacity:.4}
+.dimmed-segment-row>td:last-child>button:not(.select-anchor):not(.select-control){opacity:.4}
 .control-row{color:#fbbf24;background:rgba(245,158,11,.05)}
 .control-row td:first-child{padding-left:16px;font-weight:700}
 td button{padding:5px 7px;margin:2px 1px;white-space:nowrap}

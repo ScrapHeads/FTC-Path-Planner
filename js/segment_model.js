@@ -49,6 +49,17 @@ export function addPathSegment(path, name) {
   return segment;
 }
 
+export function focusPointSegment(path, pointIndex, control = false) {
+  const point = path.points[pointIndex];
+  if (!point) return;
+  const segments = ensurePathSegments(path);
+  const current = segments[path.activeSegment];
+  // An anchor can be shared; a control belongs to its incoming connection.
+  if (control || !current || !getSegmentPoints(path, current.id).includes(point)) {
+    path.activeSegment = segments.findIndex(segment => segment.id === point.segmentId);
+  }
+}
+
 export function pointInsertionIndex(path) {
   const segments = ensurePathSegments(path);
   if (path.activeSegment === -1) return path.points.length;

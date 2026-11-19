@@ -21,7 +21,7 @@ import { normalize } from './utils.js';
 import { canonicalToHeading, syncConfigUI } from './field_config.js';
 import { fromMeters, toMeters } from './units.js';
 import { createAnchor, removeAnchor, removeControlPoint, MAX_PATH_POINTS } from './path_model.js';
-import { addPathSegment, ensurePathSegments, getSegmentPoints, pointInsertionIndex } from './segment_model.js';
+import { addPathSegment, ensurePathSegments, focusPointSegment, pointInsertionIndex } from './segment_model.js';
 import { updateTable, syncSelectedUI, refreshDraggedRow } from './ui.js';
 import { startExclusionBox, moveExclusionBox, finishExclusionBox, isExclusionDrawingEnabled } from './exclusion_zone.js';
 
@@ -46,18 +46,13 @@ export function initInteractions() {
     state.lastMouse = mouse;
     const hit = hitTest(mouse.x, mouse.y);
     const path = state.paths[state.activePath];
+    const selectedAnchor = state.selected;
+    const selectedControl = state.selectedControl;
     state.dragMode = null;
 
     if (!hit) return;
     if (isPedroPathingSelected() && ['point', 'handle', 'control'].includes(hit.type)) {
-      const point = path.points[hit.pointIndex ?? hit.index];
-      const segments = ensurePathSegments(path);
-      const current = segments[path.activeSegment];
-      // Shared anchors keep the current segment when possible. Controls belong
-      // to the incoming connection, so they always select that connection's owner.
-      if (hit.type === 'control' || !current || !getSegmentPoints(path, current.id).includes(point)) {
-        path.activeSegment = segments.findIndex(segment => segment.id === point.segmentId);
-      }
+      focusPointSegment(path, hit.pointIndex ?? hit.index, hit.type === 'control');
     }
     if (hit.type === 'empty' && state.imgLoaded && isExclusionDrawingEnabled()) {
       startExclusionBox(mouse);
@@ -67,21 +62,22 @@ export function initInteractions() {
       state.selected = hit.pointIndex;
       state.selectedControl = { pointIndex: hit.pointIndex, controlIndex: hit.controlIndex };
       const control = path.points[hit.pointIndex].controlPoints[hit.controlIndex];
-      if (!control.locked) {
+      const wasSelected = selectedControl?.pointIndex === hit.pointIndex && selectedControl.controlIndex === hit.controlIndex;
+      if (wasSelected && !control.locked) {
         pushHistory();
         state.dragMode = 'move-control';
       }
     } else if (hit.type === 'handle') {
       state.selected = hit.index;
       state.selectedControl = null;
-      if (!path.points[hit.index].locked) {
+      if (selectedAnchor === hit.index && !selectedControl && !path.points[hit.index].locked) {
         pushHistory();
         state.dragMode = 'rotate';
       }
     } else if (hit.type === 'point') {
       state.selected = hit.index;
       state.selectedControl = null;
-      if (!path.points[hit.index].locked) {
+      if (selectedAnchor === hit.index && !selectedControl && !path.points[hit.index].locked) {
         pushHistory();
         state.dragMode = 'move-point';
       }

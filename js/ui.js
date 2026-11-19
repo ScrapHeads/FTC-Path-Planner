@@ -23,7 +23,7 @@ import {
 import { addControlPoint, removeAnchor, removeControlPoint, MAX_PATH_POINTS, getHeadingMode, setHeadingMode } from './path_model.js';
 import { addPathSegment, canRemovePathSegment, canSplitPathSegment, ensurePathSegments, getSegmentPoints, removePathSegment, segmentMethodNames, splitPathSegment } from './segment_model.js';
 import { transformFieldPose } from './coordinates.js';
-import { planSegmentReorder, planPointMove, planPointAsSegment } from './segment_model.js';
+import { planSegmentReorder, planPointMove, planPointAsSegment, focusPointSegment } from './segment_model.js';
 import { collisionReport } from './collision_state.js';
 
 let refreshPreviewUI = () => {};
@@ -313,6 +313,7 @@ function installPreviewControls() {
         </label>
       </span>
     </label>
+    <p class="small">Select All segments to see the full path step-through.</p>
     <div class="row">
       <button id="previewPrev">Prev</button>
       <button id="previewNext">Next</button>
@@ -482,6 +483,7 @@ function bindTableActions(path) {
     button.addEventListener('click', () => {
       state.selected = Number(button.dataset.point);
       state.selectedControl = null;
+      if (isPedroPathingSelected()) focusPointSegment(path, state.selected);
       refreshAll();
     });
   });
@@ -492,6 +494,7 @@ function bindTableActions(path) {
         pointIndex: Number(button.dataset.point),
         controlIndex: Number(button.dataset.control)
       };
+      if (isPedroPathingSelected()) focusPointSegment(path, state.selected, true);
       refreshAll();
     });
   });
