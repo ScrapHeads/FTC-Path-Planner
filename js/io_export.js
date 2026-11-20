@@ -114,9 +114,16 @@ export function doExport() {
     packageName: resolvePackageName(),
     className: (els.className.value || 'AutoPath').trim()
   };
+  if (state.paths[state.activePath].graph && config.library !== 'pedro') {
+    els.output.textContent = 'Select Pedro Pathing to export this branching auto.';
+    els.output._exportPayload = null;
+    return;
+  }
   if (config.library === 'pedro') {
     config.format = 'posefactory';
     config.segments = collectSegmentData();
+    const path = state.paths[state.activePath];
+    if (path.graph) config.graphEditor = { activeSection: path.segments[path.activeSegment]?.id, choices: path.graph.choices, compare: !!path.compareBranches };
   } else if (['posefactory', 'pathchain'].includes(config.format)) config.format = 'list';
   const pedroCoordinates = config.library === 'pedro' || config.format === 'pathchain';
   const pathData = config.format === 'posefactory' ? [] : collectPathData(pedroCoordinates);
@@ -161,7 +168,7 @@ export function collectSegmentData(path = state.paths[state.activePath]) {
   return ensurePathSegments(path).map(segment => {
     const points = collectPathData(true, { points: getSegmentPoints(path, segment.id) });
     if (points[0]) points[0].controlPoints = [];
-    return { name: segment.name, color: segment.color || path.color, points };
+    return { name: segment.name, color: segment.color || path.color, points, ...(path.graph ? { id: segment.id, finished: !!segment.finished, anchorIds: segment.steps.map(p => p.anchorId) } : {}) };
   });
 }
 
@@ -274,9 +281,12 @@ function buildSegmentExport(segments, config) {
     pointCount += segment.points.length - (samePose(previousEnd, segment.points[0]) ? 1 : 0);
     if (segment.points.length) previousEnd = segment.points[segment.points.length - 1];
   }
+  const graph = segments.some(s => s.anchorIds) ? segments.map(s => ({ id: s.id, anchorIds: s.anchorIds, finished: !!s.finished })) : null;
+  if (graph) pointCount = new Set(graph.flatMap(s => s.anchorIds)).size;
   if (pointCount > MAX_PATH_POINTS) throw new Error(`A path cannot contain more than ${MAX_PATH_POINTS} anchor points across its segments.`);
   const metadata = buildMetadata(config);
   const className = sanitizeJavaIdent(config.className || 'AutoPath');
+  if (graph) Object.assign(metadata,{ schemaVersion: 4, graph, ...(config.graphEditor ? { graphEditor: config.graphEditor } : {}) });
   const fileBase = sanitizeFileBase(config.className || 'AutoPath');
   if (config.fileType === 'json') {
     const content = JSON.stringify({ meta: metadata, segments: segments.map(segment => ({ name: segment.name, color: segment.color, poses: segment.points })) }, null, 2);
@@ -444,6 +454,7 @@ function buildPlannerDataComments(pathData, metadata) {
 function metadataCommentLines(metadata, prefix) {
   const compactConfig = findCompactConfig(metadata);
   const zoneLine = metadata.exclusionZones ? [`${prefix}exclusionZones=${JSON.stringify(metadata.exclusionZones)}`] : [];
+  if (metadata.graph) return Object.entries(metadata).filter(([key]) => key !== 'exclusionZones').map(([key,value]) => prefix + key + '=' + (typeof value === 'object' ? JSON.stringify(value) : value)).concat(zoneLine);
   if (compactConfig) return [`${prefix}config=${compactConfig}`, ...zoneLine];
   return Object.entries(metadata).filter(([key]) => key !== 'exclusionZones').map(([key, value]) => `${prefix}${key}=${value}`).concat(zoneLine);
 }

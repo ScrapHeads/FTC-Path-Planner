@@ -14,6 +14,7 @@ export function headingSettings(point) {
 
 export function setHeadingMode(point, mode) {
   if (!['linear', 'tangent', 'constant'].includes(mode)) throw new Error('Unsupported heading mode.');
+  if (point.anchorId) { point.headingMode = mode; point.constantHeadingRad = undefined; return; }
   delete point.headingMode;
   delete point.constantHeadingRad;
   if (mode !== 'linear') point.headingMode = mode;
@@ -70,6 +71,19 @@ export function removeControlPoint(path, endIndex, controlIndex) {
 
 export function removeAnchor(path, index) {
   if (!path || index < 0 || index >= path.points.length) return false;
+  if (path.graph) {
+    const p = path.points[index];
+    if (path.points.filter(other => other.anchorId === p.anchorId).length !== 1) return false;
+    const section = path.segments.find(s => s.id === p.segmentId);
+    if (section.steps.length <= 1) return false;
+    const local = section.steps.findIndex(item => item.anchorId === p.anchorId);
+    section.steps.splice(local,1);
+    path.graph.anchors = path.graph.anchors.filter(a => a.id !== p.anchorId);
+    path.points.splice(index,1);
+    if (section.steps[local]) section.steps[local].controlPoints = [];
+    if (!local) path.points[index].breakBefore = true;
+    return true;
+  }
   const breakBefore = path.points[index].breakBefore;
   path.points.splice(index, 1);
   // The next anchor's controls described a segment starting at the deleted anchor.

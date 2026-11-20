@@ -261,3 +261,8 @@ code{background:#0f141b;border:1px solid #223041;padding:8px;display:block;borde
 tr.collision-row{box-shadow:inset 3px 0 #ef4444;background:rgba(239,68,68,.16);color:#ff9999}
 button:disabled{opacity:.45;cursor:default}
 .dragging{outline:2px dashed var(--accent)}
+
+#branchActions { display: grid; gap: 6px; margin-bottom: 12px; }
+#branchActions .row { margin: 0; }
+#routeChoices:empty { display: none; }
+.graph-editing :is(#addSegment,#deleteSegment,#pointAsSegment,#pointSegmentTarget,#movePointSegment,#pointMoveStatus,#legacySegmentHelp,label[for="pointSegmentTarget"]) { display: none; }

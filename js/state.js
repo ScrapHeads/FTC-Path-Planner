@@ -1,4 +1,4 @@
-import { headingSettings } from './path_model.js';
+import { bindGraph, focusedRoute, pathDocument } from './branch_graph.js';
 
 // Shared mutable state
 export const PATH_COLORS = ['#666666', '#FD3DB5', '#81c784', '#ffb74d']; // silver, magenta, green, orange
@@ -92,13 +92,13 @@ export const state = {
 export function setPreviewEnabled(on){
   const path = state.paths[state.activePath];
   path.previewEnabled = on;
-  if (!on) path.previewIndex = path.points.length - 1;
+  if (!on) path.previewIndex = previewCount(path) - 1;
 }
 
 export function setPreviewIndex(idx){
   const path = state.paths[state.activePath];
   if (!path.points.length) { path.previewIndex = -1; return; }
-  path.previewIndex = Math.max(-1, Math.min(idx, path.points.length - 1));
+  path.previewIndex = Math.max(-1, Math.min(idx, previewCount(path) - 1));
 }
 
 export function stepPreview(delta){ setPreviewIndex(state.paths[state.activePath].previewIndex + delta); }
@@ -112,23 +112,7 @@ export function getVisibleWaypointCount(){
 // ---- History helpers ----
 function snapshot(){
   return {
-    paths: state.paths.map(path => ({
-      name: path.name,
-      color: path.color,
-      className: path.className,
-      segments: path.segments?.map(segment => ({ ...segment })),
-      activeSegment: path.activeSegment,
-      points: path.points.map(p => ({
-        xPx:+p.xPx, yPx:+p.yPx, headingRad:+p.headingRad, locked: !!p.locked,
-        segmentId: p.segmentId, breakBefore: p.breakBefore,
-        ...headingSettings(p),
-        controlPoints: (p.controlPoints || []).map(control => ({
-          xPx: +control.xPx, yPx: +control.yPx, locked: !!control.locked
-        }))
-      })),
-      previewEnabled: !!path.previewEnabled,
-      previewIndex: path.previewIndex
-    })),
+    paths: structuredClone(state.paths.map(pathDocument)),
     activePath: state.activePath,
     headingWrapHalf: state.headingWrapHalf,
     fieldConfig: { ...state.fieldConfig },
@@ -139,23 +123,8 @@ function snapshot(){
 }
 
 function restore(snap){
-  state.paths = snap.paths.map(path => ({
-    name: path.name,
-    color: path.color,
-    className: path.className,
-    segments: path.segments?.map(segment => ({ ...segment })),
-    activeSegment: path.activeSegment,
-    points: path.points.map(p => ({
-      xPx:+p.xPx, yPx:+p.yPx, headingRad:+p.headingRad, locked: !!p.locked,
-      segmentId: p.segmentId, breakBefore: p.breakBefore,
-      ...headingSettings(p),
-      controlPoints: (p.controlPoints || []).map(control => ({
-        xPx: +control.xPx, yPx: +control.yPx, locked: !!control.locked
-      }))
-    })),
-    previewEnabled: !!path.previewEnabled,
-    previewIndex: path.previewIndex
-  }));
+  state.paths = structuredClone(snap.paths);
+  for (const path of state.paths) if (path.graph) bindGraph(path);
   state.activePath = Math.max(0, Math.min(snap.activePath ?? 0, state.paths.length - 1));
   state.selected = -1;
   state.selectedControl = null;
@@ -189,4 +158,9 @@ export function redo(){
   state._history.push(current);
   restore(next);
   return true;
+}
+
+export function previewCount(path) {
+  if (!path.graph) return path.points.length;
+  return new Set(focusedRoute(path.graph,path.segments[path.activeSegment]).flatMap(s => s.steps.map(p => p.anchorId))).size;
 }

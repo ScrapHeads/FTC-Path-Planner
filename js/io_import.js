@@ -12,6 +12,7 @@ import {
   syncConfigUI
 } from './field_config.js';
 import { createAnchor, MAX_PATH_POINTS } from './path_model.js';
+import { bindGraph } from './branch_graph.js';
 import { ensurePathSegments, samePose } from './segment_model.js';
 import { parsePedroJavaSegments } from './pedro_java.js';
 import { parseImportedZones } from './exclusion_model.js';
@@ -54,6 +55,7 @@ export async function importWaypointsFromText(text, filename = 'path.txt') {
     metadata = {};
     for (const line of text.split(/\r?\n/)) if (/^\s*#/.test(line)) parseMetadataLine(line, metadata);
   } else { metadata = parseJavaMetadata(text); javaText = text; }
+  if (Number(metadata.schemaVersion) > 4) throw Error('Unsupported planner file version.');
   const imported = parseImportedZones(metadata, javaText);
   const previousZones = state.exclusionZones, previousSettings = { ...state.exclusionSettings };
   try { await importPathContents(text, filename); }
@@ -99,6 +101,7 @@ async function importJson(text) {
   await ensureImageForMetadata(metadata);
   applyExportSelections(metadata);
 
+  if (metadata.schemaVersion >= 4 && !Array.isArray(value.segments)) throw Error('Missing graph sections.');
   if (Array.isArray(value?.segments)) {
     loadSegments(value.segments.map(segment => ({ ...segment, points: segment.poses || segment.points || [] })), metadata);
     return;
@@ -119,6 +122,7 @@ async function importJson(text) {
       point.headingMode,
       point.constantHeadingRad
     ));
+    delete state.paths[state.activePath].graph;
     delete state.paths[state.activePath].segments;
     ensurePathSegments(state.paths[state.activePath]);
     return;
@@ -141,6 +145,7 @@ async function importCsv(text) {
 
   const header = records.shift().map(value => value.trim().toLowerCase());
   const rows = records;
+  if (metadata.schemaVersion >= 4 && !header.includes('segment_index')) throw Error('Missing graph section records.');
   if (header.includes('segment_index')) {
     const segments = new Map();
     rows.forEach(row => {
@@ -238,9 +243,18 @@ async function importJava(text) {
 
   const segments = parsePedroJavaSegments(text);
   if (segments) {
+    if (!metadata.graph && Number(metadata.schemaVersion || 0) < 4) {
+      const refs = segments.flatMap(s => s.points.map(p => p.poseReference)).filter(Boolean);
+      if (refs.length !== new Set(refs).size) {
+        metadata.graph = segments.map((s,i) => ({
+          id: 's' + (i+1), anchorIds: s.points.map((p,j) => p.poseReference || ('point-' + i + '-' + j))
+        }));
+      }
+    }
     loadSegments(segments, { ...metadata, library: 'pedro', format: 'posefactory', dataMeasurementUnit: 'in', dataOrigin: 'bottomLeft', dataCoordinateSystem: 'pedro' });
     return;
   }
+  if (metadata.schemaVersion >= 4 || metadata.graph) throw Error('Missing graph path declarations.');
   const pathChainPoses = parsePedroPathChain(text);
   if (pathChainPoses.length) {
     const pedroMetadata = {
@@ -323,6 +337,7 @@ function structuredPoints(poses, metadata) {
 function loadStructuredPoses(poses, metadata) {
   const path = state.paths[state.activePath];
   path.points = structuredPoints(poses, metadata);
+  delete path.graph;
   delete path.segments;
   ensurePathSegments(path);
   path.previewIndex = path.points.length - 1;
@@ -330,6 +345,39 @@ function loadStructuredPoses(poses, metadata) {
 
 function loadSegments(segments, metadata) {
   const pedroMetadata = { ...metadata, library: 'pedro', format: 'posefactory' };
+  if (metadata.graph || Number(metadata.schemaVersion) === 4) {
+    const structure = typeof metadata.graph === 'string' ? JSON.parse(metadata.graph) : metadata.graph;
+    if (!Array.isArray(structure) || structure.length !== segments.length) throw Error('Missing graph sections.');
+    const anchors = new Map(), referenceIds = new Map(), idReferences = new Map();
+    const sections = segments.map((segment,i) => {
+      const { id, anchorIds } = structure[i];
+      if (!Array.isArray(anchorIds) || anchorIds.length !== segment.points.length) throw Error('Graph connections disagree with section geometry.');
+      const steps = structuredPoints(segment.points,pedroMetadata).map((point,j) => {
+        const anchorId = anchorIds[j];
+        if (segment.points[j].controlPoints?.length > 2) throw Error('A connection supports up to two curve handles.');
+        const reference = segment.points[j].poseReference;
+        if (reference) {
+          if (referenceIds.has(reference) && referenceIds.get(reference) !== anchorId ||
+              idReferences.has(anchorId) && idReferences.get(anchorId) !== reference) throw Error('Executable junction references disagree with graph metadata.');
+          referenceIds.set(reference,anchorId); idReferences.set(anchorId,reference);
+        }
+        const { xPx,yPx,headingRad,locked,controlPoints,...settings } = point;
+        const anchor = { id: anchorId,xPx,yPx,headingRad,locked };
+        if (anchors.has(anchorId) && !samePose(anchors.get(anchorId),anchor)) throw Error('Inconsistent shared junction pose: ' + anchorId);
+        anchors.set(anchorId,anchor);
+        return { anchorId,controlPoints,...settings };
+      });
+      return { id,name:segment.name,color:segment.color || '#38bdf8',finished:!!structure[i].finished,steps };
+    });
+    const path = state.paths[state.activePath];
+    const editor = typeof metadata.graphEditor === 'string' ? JSON.parse(metadata.graphEditor) : metadata.graphEditor;
+    bindGraph(path,{ version:1,anchors:[...anchors.values()],sections,choices:editor?.choices || {} });
+    path.compareBranches = !!editor?.compare;
+    path.activeSegment = Math.max(0,sections.findIndex(s => s.id === editor?.activeSection));
+    path.previewIndex = path.points.length-1;
+    applyExportSelections(pedroMetadata);
+    return;
+  }
   const labels = [];
   const points = [];
   // A file represents one autonomous program. Validate before replacing that slot.
@@ -345,6 +393,7 @@ function loadSegments(segments, metadata) {
   });
   assertPointLimit(points);
   const path = state.paths[state.activePath];
+  delete path.graph;
   path.points = points;
   path.segments = labels;
   path.activeSegment = -1;

@@ -149,3 +149,20 @@ test('malformed JSON and unavailable storage do not throw or mutate state', () =
     console.warn = warn;
   }
 });
+
+test('saved graph rebinds edits to one shared junction after reload', async () => {
+  reset();
+  const { migrateGraph,bindGraph,fork,appendAnchor } = await import('../js/branch_graph.js');
+  const path = state.paths[0];
+  path.points = [0,10,20].map(xPx=>({xPx,yPx:1,headingRad:0,controlPoints:[]}));
+  const graph = migrateGraph(path), section = fork(graph,'a2','tipped');
+  appendAnchor(graph,section,{ xPx:3,yPx:8,headingRad:0 });
+  bindGraph(path,graph);
+  saveAppState();
+  state.paths=[];
+  assert.ok(restoreAppState());
+  const views=state.paths[0].points.filter(p=>p.anchorId==='a2');
+  assert.equal(views.length,3);
+  views[0].yPx=22;
+  assert.ok(views.every(p=>p.yPx===22));
+});

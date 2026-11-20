@@ -23,6 +23,8 @@ import {
 import { addControlPoint, removeAnchor, removeControlPoint, MAX_PATH_POINTS, getHeadingMode, setHeadingMode } from './path_model.js';
 import { addPathSegment, canRemovePathSegment, canSplitPathSegment, ensurePathSegments, getSegmentPoints, removePathSegment, segmentMethodNames, splitPathSegment } from './segment_model.js';
 import { transformFieldPose } from './coordinates.js';
+import { bindGraph, promote, graphWarnings, migrateGraph, fork, duplicateSection, rejoin, validTargets, prune, deletionSet, insertMidpoint, selectRoute, focusedRoute, outgoing, startId } from './branch_graph.js';
+import { previewCount } from './state.js';
 import { planSegmentReorder, planPointMove, planPointAsSegment, focusPointSegment } from './segment_model.js';
 import { collisionReport } from './collision_state.js';
 
@@ -35,6 +37,7 @@ export function initUI() {
   installSegmentControls();
 
   els.javaType?.addEventListener('change', () => {
+    if (state.paths[state.activePath].graph) els.javaType.value = 'pedro';
     if (!isPedroPathingSelected()) state.selectedControl = null;
     refreshAll();
   });
@@ -57,6 +60,7 @@ export function initUI() {
     const path = state.paths[state.activePath];
     if ((!path.points.length && !path.segments?.length) || !confirm("Clear selected path's points and segments?")) return;
     pushHistory();
+    delete path.graph;
     path.points = [];
     path.segments = [];
     path.activeSegment = -1;
@@ -69,6 +73,7 @@ export function initUI() {
     if (!state.paths.some(path => path.points.length || path.segments?.length) || !confirm("Clear all paths' points and segments?")) return;
     pushHistory();
     state.paths.forEach(path => {
+      delete path.graph;
       path.points = [];
       path.segments = [];
       path.activeSegment = -1;
@@ -133,6 +138,7 @@ function installFieldConfigurationHandlers() {
 export function setActivePath(index, { preserveSelection = false } = {}) {
   state.activePath = Math.max(0, Math.min(index, state.paths.length - 1));
   els.className.value = state.paths[state.activePath].className || 'AutoPath';
+  if (state.paths[state.activePath].graph && !isPedroPathingSelected()) { els.javaType.value = 'pedro'; els.javaType.dispatchEvent(new Event('change')); }
   if (!preserveSelection) clearSelection();
   [els.path1Btn, els.path2Btn, els.path3Btn, els.path4Btn].forEach((button, buttonIndex) => {
     button?.classList.toggle(`active-path${buttonIndex}`, buttonIndex === state.activePath);
@@ -144,11 +150,60 @@ export function setActiveSegment(index) {
   const path = state.paths[state.activePath];
   const segments = ensurePathSegments(path);
   path.activeSegment = Number.isInteger(index) ? Math.max(-1, Math.min(index, segments.length - 1)) : -1;
+  if (path.graph && segments[index]) {
+    selectRoute(path.graph,segments[index]);
+    setPreviewIndex(path.previewIndex);
+  }
   clearSelection();
   refreshAll();
 }
 
 function installSegmentControls() {
+  document.getElementById('branchActions')?.addEventListener('click', event => {
+    const action = event.target.dataset.branch;
+    if (!action) return;
+    const path = state.paths[state.activePath];
+    const selected = state.selectedControl ? null : path.points[state.selected];
+    try {
+      const graph = structuredClone(migrateGraph(path));
+      let s = graph.sections[path.activeSegment] || graph.sections.find(s => s.id === selected?.segmentId);
+      const local = selected && getSegmentPoints(path,selected.segmentId).indexOf(selected);
+      const owner = graph.sections.find(part => part.id === selected?.segmentId);
+      const id = owner?.steps[local]?.anchorId;
+      if (action === 'fork') {
+        if (!id) throw Error('Select an anchor first.');
+        s = fork(graph,id,'Branch ' + (graph.sections.length+1));
+      } else if (action === 'insert') {
+        if (!id) throw Error('Select the destination of a connection.');
+        insertMidpoint(graph,owner,local);
+        s = owner;
+      } else if (!s) throw Error('Select a section first.');
+      else if (action === 'finish') {
+        if (s.steps.length < 2 || outgoing(graph,s.steps.at(-1).anchorId).length || graph.sections.some(other => other !== s && other.steps.at(-1)?.anchorId === s.steps.at(-1).anchorId)) throw Error('Choose a branch with its own ending.');
+        s.finished = !s.finished;
+      }
+      else if (action === 'duplicate') s = duplicateSection(graph,s);
+      else if (action === 'join') rejoin(graph,s,document.getElementById('joinTarget').value);
+      else if (action === 'delete') {
+        const removed = deletionSet(graph,s);
+        if (removed.size > 1 && !confirm('Also delete ' + (removed.size-1) + ' downstream sections?')) return;
+        graph.sections = graph.sections.filter(part => !removed.has(part));
+        prune(graph);
+        s = graph.sections[0];
+      }
+      pushHistory();
+      if (!s) { delete path.graph; path.points = []; path.segments = []; path.activeSegment = -1; }
+      else { path.activeSegment = graph.sections.indexOf(s); selectRoute(graph,s); bindGraph(path,graph); }
+      clearSelection(); refreshAll();
+    } catch (error) { els.segmentStatus.textContent = error.message; }
+  });
+  document.getElementById('sectionColor')?.addEventListener('change', event => {
+    const path = state.paths[state.activePath], section = path.segments[path.activeSegment];
+    if (section) { pushHistory(); section.color = event.target.value; refreshAll(); }
+  });
+  document.getElementById('allBranches')?.addEventListener('change', event => {
+    state.paths[state.activePath].compareBranches = event.target.checked; draw();
+  });
   els.segmentHeadingMode.addEventListener('change', () => {
     const path = state.paths[state.activePath];
     const segment = ensurePathSegments(path)[path.activeSegment];
@@ -195,6 +250,14 @@ function installSegmentControls() {
   });
   els.splitSegment.addEventListener('click', () => {
     const path = state.paths[state.activePath];
+    if (path.graph) {
+      const point = path.points[state.selected];
+      if (!point || state.selectedControl) return;
+      pushHistory();
+      const next = promote(path.graph,point.anchorId);
+      if (next) { path.activeSegment = path.segments.indexOf(next); bindGraph(path); clearSelection(); refreshAll(); }
+      return;
+    }
     if (state.selectedControl || !canSplitPathSegment(path, state.selected)) return;
     pushHistory();
     splitPathSegment(path, state.selected);
@@ -212,6 +275,13 @@ function installSegmentControls() {
 }
 
 function reorderSelectedSegment(delta) {
+  const path = state.paths[state.activePath];
+  if (path.graph) {
+    pushHistory();
+    const s = path.segments.splice(path.activeSegment,1)[0];
+    path.activeSegment += delta;
+    path.segments.splice(path.activeSegment,0,s); bindGraph(path); clearSelection(); refreshAll(); return;
+  }
   applySegmentEdit(path => planSegmentReorder(path, path.activeSegment, path.activeSegment + delta));
 }
 
@@ -242,13 +312,52 @@ export function refreshSegmentControls() {
   if (!pedro) return;
   const path = state.paths[state.activePath];
   const segments = ensurePathSegments(path);
+  const graph = path.graph;
+  const compare = document.getElementById('allBranches');
+  if (compare) { compare.checked = !!path.compareBranches; compare.disabled = !graph; }
+  const browser = document.getElementById('routeChoices');
+  if (browser?.replaceChildren && document.querySelector?.('[data-branch="join"]')) {
+    browser.replaceChildren();
+    if (graph) for (const s of focusedRoute(graph,segments[path.activeSegment])) {
+      const options = outgoing(graph,startId(s));
+      if (options.length < 2) continue;
+      const field = document.createElement('select');
+      field.setAttribute('aria-label','Route at ' + startId(s));
+      options.forEach(option => field.add(new Option(option.name,option.id)));
+      field.value = s.id;
+      field.onchange = () => setActiveSegment(segments.findIndex(part => part.id === field.value));
+      const label = document.createElement('label');
+      label.textContent = 'Fork at ' + startId(s);
+      label.append(field);
+      browser.append(label);
+    }
+    const active = segments[path.activeSegment];
+    const color = document.getElementById('sectionColor');
+    color.disabled = !active;
+    color.value = /^#[0-9a-f]{6}$/i.test(active?.color) ? active.color : '#38bdf8';
+    const finish = document.querySelector('[data-branch="finish"]');
+    finish.textContent = active?.finished ? 'Extend ending' : 'Finish independently';
+    finish.disabled = !active || getSegmentPoints(path,active.id).length < 2 || !!graph && (outgoing(graph,active.steps.at(-1)?.anchorId).length > 0 || graph.sections.some(other => other !== active && other.steps.at(-1)?.anchorId === active.steps.at(-1)?.anchorId));
+    els.segmentControls.classList.toggle('graph-editing',!!graph);
+    const target = document.getElementById('joinTarget');
+    const previous = target.value;
+    target.replaceChildren(...(graph ? validTargets(graph,segments[path.activeSegment]) : []).map(a => {
+      const p = path.points.find(p => p.anchorId === a.id);
+      const part = segments.find(s => s.id === p.segmentId);
+      return new Option(part.name + ' · ' + a.id,a.id);
+    }));
+    if ([...target.options].some(o => o.value === previous)) target.value = previous;
+    document.querySelector('[data-branch="join"]').disabled = !target.options.length;
+  }
   const allOption = document.createElement('option');
   allOption.value = '-1';
+  allOption.disabled = !!graph;
   allOption.textContent = 'All segments';
   els.segmentSelect.replaceChildren(allOption, ...segments.map((segment, index) => {
     const option = document.createElement('option');
     option.value = String(index);
-    option.textContent = `${segment.name} (${getSegmentPoints(path, segment.id).length} points)`;
+    const depth = graph ? focusedRoute(graph,segment).slice(0,focusedRoute(graph,segment).indexOf(segment)+1).filter(s => outgoing(graph,startId(s)).length > 1).length : 0;
+    option.textContent = `${'　'.repeat(depth)}${segment.name} (${getSegmentPoints(path, segment.id).length} points)`;
     const report = collisionReport().paths[state.activePath];
     if (getSegmentPoints(path, segment.id).some(point => {
       const pointIndex = path.points.indexOf(point);
@@ -290,11 +399,17 @@ export function refreshSegmentControls() {
   els.segmentName.value = segment?.name || '';
   els.segmentName.placeholder = segment ? 'Collect samples' : 'Select a segment to rename';
   const method = segmentMethodNames(segments)[path.activeSegment];
-  const detail = !segment ? 'Showing all segments. New points append to the last segment.'
+  const detail = segment?.finished ? 'Independent ending.' : !segment ? 'Showing all segments. New points append to the last segment.'
     : getSegmentPoints(path, segment.id).length >= 2 ? `Exports as ${method}()` : 'Add at least two anchors to export a path method.';
-  els.segmentStatus.textContent = `${path.name}: ${path.points.length}/${MAX_PATH_POINTS} anchor points across all segments. ${detail}${path.points.length >= MAX_PATH_POINTS ? ' Point limit reached.' : ''}`;
+  els.segmentStatus.textContent = `${path.name}: ${graph?.anchors.length ?? path.points.length}/${MAX_PATH_POINTS} anchor points across all segments. ${detail}${(graph?.anchors.length ?? path.points.length) >= MAX_PATH_POINTS ? ' Point limit reached.' : ''}`;
+  if (graph) els.segmentStatus.textContent += ' ' + graphWarnings(graph).join(' ');
   els.splitSegment.disabled = !!state.selectedControl || !canSplitPathSegment(path, state.selected);
   els.deleteSegment.disabled = !canRemovePathSegment(path, path.activeSegment);
+  if (graph) {
+    const owner = segments.find(s => s.id === selectedPoint?.segmentId);
+    els.splitSegment.disabled = !owner?.steps.slice(1,-1).some(item => item.anchorId === selectedPoint.anchorId);
+    for (const el of [els.pointAsSegment,els.movePointSegment,els.deleteSegment,els.addSegment]) el.disabled = true;
+  }
   els.deleteSegment.title = !segment ? 'Select a segment to remove its label.' : segments.length <= 1 ? 'Keep at least one segment in this path.' : els.deleteSegment.disabled ? 'Disconnected routes need separate segment labels.' : 'Keep the points and merge this label into its neighbor.';
 }
 
@@ -367,12 +482,12 @@ function installPreviewControls() {
 
   refreshPreviewUI = () => {
     const path = state.paths[state.activePath];
-    slider.max = String(Math.max(-1, path.points.length - 1));
+    slider.max = String(Math.max(-1, previewCount(path) - 1));
     slider.value = String(path.previewIndex);
     toggle.checked = path.previewEnabled;
     dimFuture.checked = state.dimFuture;
     status.textContent = path.previewEnabled
-      ? `Showing ${getVisibleWaypointCount()} of ${path.points.length} anchors`
+      ? `Showing ${getVisibleWaypointCount()} of ${previewCount(path)} anchors`
       : `Preview disabled • ${path.points.length} anchors`;
   };
   refreshPreviewUI();
@@ -606,6 +721,16 @@ function deleteSelectedEntity() {
 
 function moveAnchor(path, index, direction) {
   const target = index + direction;
+  if (path.graph) {
+    const p = path.points[index], q = path.points[target];
+    if (!q || q.segmentId !== p.segmentId) return;
+    const s = path.segments.find(s => s.id === p.segmentId);
+    const i = s.steps.findIndex(item => item.anchorId === p.anchorId), j = i + direction;
+    if (Math.min(i,j) < 1 || Math.max(i,j) >= s.steps.length-1) return;
+    pushHistory();
+    [s.steps[i],s.steps[j]] = [s.steps[j],s.steps[i]];
+    bindGraph(path); state.selected = target; refreshAll(); return;
+  }
   if (target < 0 || target >= path.points.length) return;
   pushHistory();
   const memberships = path.points.map(point => ({ segmentId: point.segmentId, breakBefore: point.breakBefore }));
@@ -622,7 +747,7 @@ function applyTransform(kind) {
   if (!state.imgLoaded || !path.points.length) return;
   pushHistory();
   const pivot = imagePxToField(state.img.width / 2, state.img.height / 2);
-  path.points = path.points.map(point => {
+  const transformedPoints = path.points.map(point => {
     const field = imagePxToField(point.xPx, point.yPx);
     const transformed = transformFieldPose(field.x, field.y, point.headingRad, kind, pivot);
     const image = fieldToImagePx(transformed.x, transformed.y);
@@ -642,6 +767,8 @@ function applyTransform(kind) {
       })
     };
   });
+  if (path.graph) transformedPoints.forEach((point,i) => Object.assign(path.points[i],point));
+  else path.points = transformedPoints;
   refreshAll();
 }
 

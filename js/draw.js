@@ -3,6 +3,7 @@ import { state, PATH_COLORS } from './state.js';
 import { layout, withCanvasLayout, imagePxToCanvas, pxToField, headingToCanvasAngle } from './layout.js';
 import { doExport } from './io_export.js';
 import { sampleSegment, evaluateBezier } from './path_model.js';
+import { focusedRoute, outgoing, incoming, startId, endId } from './branch_graph.js';
 import { ensurePathSegments, getSegmentPoints } from './segment_model.js';
 import { drawExclusionBox } from './exclusion_zone.js';
 import { collisionReport } from './collision_state.js';
@@ -54,6 +55,10 @@ function drawPathsAndPoints() {
   const reports = collisionReport().paths;
   state.paths.forEach((path, pathIndex) => {
     const collisions = reports[pathIndex];
+    if (path.graph) {
+      drawGraph(path,pathIndex,collisions);
+      return;
+    }
     const visibleCount = path.previewEnabled
       ? Math.max(0, Math.min(path.points.length, path.previewIndex + 1))
       : path.points.length;
@@ -79,6 +84,47 @@ function drawPathsAndPoints() {
   });
 }
 
+function drawGraph(path,pathIndex,collisions) {
+  const g = path.graph;
+  const current = path.segments[path.activeSegment];
+  const route = focusedRoute(g,current);
+  const order = [...new Set(route.flatMap(s => s.steps.map(p => p.anchorId)))];
+  const shown = new Set(path.previewEnabled ? order.slice(0,path.previewIndex+1) : order);
+  const visible = new Set(route.map(s => s.id));
+  const compare = path.compareBranches;
+  for (const s of g.sections) {
+    const points = getSegmentPoints(path,s.id);
+    const focused = visible.has(s.id);
+    const common = outgoing(g,endId(s)).length > 1 || incoming(g,startId(s)).length > 1;
+    for (let i=1;i<points.length;i++) {
+      const p = points[i], index = path.points.indexOf(p);
+      drawSegment(points[i-1],p,common ? '#cbd5e1' : s.color,!(compare || focused && shown.has(p.anchorId)),true,true);
+      if (focused && collisions.connections[index]) drawCollisionIntervals(points[i-1],p,collisions.connections[index],true);
+      if (s === current && pathIndex === state.activePath && index === state.selected) {
+        drawControlPolygon(path,index,false); drawControls(path,index,false);
+      }
+    }
+  }
+  const drawn = new Set();
+  for (const p of [...path.points].sort((a,b) => Number(b.segmentId === current?.id)-Number(a.segmentId === current?.id))) {
+    if (drawn.has(p.anchorId) || !visible.has(p.segmentId)) continue;
+    drawn.add(p.anchorId);
+    const i = path.points.indexOf(p);
+    drawAnchor(path,pathIndex,p,i,!shown.has(p.anchorId),!!collisions.anchors[i]?.length,collisions.headings[i]);
+    const fork = outgoing(g,p.anchorId).length > 1, merge = incoming(g,p.anchorId).length > 1;
+    if (fork || merge) {
+      const pos = imagePxToCanvas(p.xPx,p.yPx);
+      ctx.save(); ctx.fillStyle = merge ? '#fb923c' : '#38bdf8';
+      ctx.translate(pos.x,pos.y);
+      if (fork) ctx.rotate(Math.PI/4);
+      ctx.fillRect(-4*dpi,-4*dpi,8*dpi,8*dpi); ctx.restore();
+      if (i === state.selected || state.hoverActive && Math.hypot(state.hoverPos.x-pos.x,state.hoverPos.y-pos.y)<12*dpi) {
+        ctx.fillStyle = '#fff'; ctx.fillText(merge ? 'Rejoin' : 'Fork',pos.x+8*dpi,pos.y+15*dpi);
+      }
+    }
+  }
+}
+
 const geometryCache = new WeakMap();
 function segmentGeometry(start, end, controlsEnabled) {
   const controls = controlsEnabled ? end.controlPoints || [] : [];
@@ -91,11 +137,11 @@ function segmentGeometry(start, end, controlsEnabled) {
   return geometry;
 }
 
-function drawSegment(start, end, color, isFuture, controlsEnabled) {
+function drawSegment(start, end, color, isFuture, controlsEnabled, thin = false) {
   const { samples } = segmentGeometry(start, end, controlsEnabled);
   ctx.save();
   ctx.strokeStyle = isFuture ? 'rgba(148, 163, 184, 0.45)' : color;
-  ctx.lineWidth = 3 * dpi;
+  ctx.lineWidth = (thin && isFuture ? 1 : 3) * dpi;
   if (isFuture) ctx.setLineDash([7 * dpi, 6 * dpi]);
   ctx.beginPath();
   samples.forEach((sample, index) => {

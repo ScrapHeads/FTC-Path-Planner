@@ -170,3 +170,18 @@ js/io_export.js         JSON, CSV, and Java generation
 js/io_import.js         JSON, CSV, and Java parsing
 test/                   Automated tests
 ```
+
+## Branching HIVE routes
+
+Each path slot holds one auto. In Pedro mode, draw an approach, a normal garden pickup, a score point, and a return. Select the last approach waypoint and choose **Branch from anchor**. The planner splits the original section there. Rename the shared section **Approach** and its original continuation **Garden normal**.
+
+1. Name the new alternative **Garden tipped**. Hover over the field and press **N** to add its pickup waypoints.
+2. Select the score anchor in the rejoin menu and choose **Rejoin here**. Rename the shared downstream section **Return to score**. Moving or rotating the junction updates both arrivals and the return.
+3. Select a waypoint on Garden tipped and branch again. Name the alternative **Tipped alternate pickup**. It can rejoin the score anchor too.
+4. For an independent ending, fork from a pickup waypoint, name the section **Alternate park**, add its parking waypoint and choose **Finish independently**. **Extend ending** opens it for more waypoints.
+
+Use the section selector to edit a branch and the route selectors to choose the approach and continuation at nested forks. **All branches** compares the alternatives. Collision checks cover every authored section. A collision badge identifies a section even when its route is faded.
+
+**Insert midpoint** splits the incoming line or Bézier at its midpoint. Internal waypoints can be reordered within their section. Section order only changes the navigator and export order after branching. Mirroring transforms the whole auto. Delete a branch to remove its exclusive geometry. A shared continuation survives as long as another branch reaches it.
+
+Java exports one zero-argument Pedro `Path` method per complete section and one pose declaration per anchor. For example, robot code can call `approach()`, `gardenNormal()`, and `returnToScore()`, or choose the tipped route and finish with `alternatePark()`. The planner exports the geometry. The robot program chooses which methods to follow. Keep the planner metadata for editable Java, JSON and CSV round trips.

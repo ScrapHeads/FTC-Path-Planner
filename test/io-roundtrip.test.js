@@ -512,3 +512,83 @@ test('zone edits and toggles are included in undo/redo snapshots', () => {
     assert.equal(state.exclusionSettings.exportEnabled, true);
   } finally { state.exclusionZones = oldZones; state.exclusionSettings = oldSettings; }
 });
+
+const graphModel = await import('../js/branch_graph.js');
+
+function seedFork() {
+  const path = createPath('HIVE', [createAnchor(0,800),createAnchor(400,800),createAnchor(800,800),createAnchor(1000,800)]);
+  state.activePath = 0;
+  seedPath();
+  state.paths[0] = path;
+  const g = graphModel.migrateGraph(path);
+  const tipped = graphModel.fork(g,'a2','Garden tipped');
+  graphModel.appendAnchor(g,tipped,createAnchor(600,300,0,false,[{xPx:500,yPx:300}],'tangent'));
+  graphModel.rejoin(g,tipped,'a3');
+  const parking = graphModel.fork(g,tipped.steps[1].anchorId,'Alternate park');
+  graphModel.appendAnchor(g,parking,createAnchor(650,150));
+  graphModel.bindGraph(path,g);
+  return {path,g,tipped,parking};
+}
+
+for (const fileType of ['json','csv','java-class']) {
+  test('nested HIVE graph round trips through ' + fileType, async () => {
+    const {path,g} = seedFork();
+    const artifact = buildExportArtifacts([],segmentConfig(fileType));
+    if (fileType === 'java-class') {
+      assert.equal((artifact.content.match(/public final Pose /g)||[]).length,g.anchors.length);
+      assert.equal((artifact.content.match(/public Path /g)||[]).length,g.sections.length);
+    }
+    const ids = g.sections.map(s=>s.steps.map(p=>p.anchorId));
+    await importWaypointsFromText(artifact.content,'HIVE.' + (fileType === 'java-class' ? 'java' : fileType));
+    assert.deepEqual(path.graph.sections.map(s=>s.steps.map(p=>p.anchorId)),ids);
+    for (const a of g.anchors) {
+      const restored = path.graph.anchors.find(other=>other.id===a.id);
+      assert.ok(Math.hypot(restored.xPx-a.xPx,restored.yPx-a.yPx)<1e-6);
+    }
+    assert.equal(path.graph.sections.filter(s=>s.steps.some(p=>p.headingMode==='tangent')).length,1);
+    const views = path.points.filter(p=>p.anchorId==='a2');
+    views[0].headingRad = 1.25;
+    assert.ok(views.every(p=>p.headingRad===1.25));
+  });
+}
+
+test('hidden branch collisions survive focus changes and undo restores shared pose editing', async () => {
+  const {path,g,parking} = seedFork();
+  const endpoint = parking.steps.at(-1).anchorId;
+  const point = path.points.find(p=>p.anchorId===endpoint);
+  const pose = collectPathData(true,{points:[point]})[0];
+  state.robotDimensions = { lengthM:0.02,widthM:0.02 };
+  state.exclusionZones = [{id:'park',name:'parking obstacle',enabled:true,minX:pose.x-1,maxX:pose.x+1,minY:pose.y-1,maxY:pose.y+1}];
+  state.exclusionSettings.checkingEnabled = true;
+  const {collisionReport} = await import('../js/collision_state.js');
+  path.activeSegment = 0;
+  assert.ok(!graphModel.focusedRoute(g,path.segments[0]).includes(parking));
+  assert.deepEqual(collisionReport().paths[0].anchors[path.points.indexOf(point)],['park']);
+  pushHistory();
+  path.points.find(p=>p.anchorId==='a2').xPx = 705;
+  undo(); redo();
+  assert.ok(state.paths[0].points.filter(p=>p.anchorId==='a2').every(p=>p.xPx===705));
+  state.paths[0].points.find(p=>p.anchorId==='a2').xPx = 810;
+  assert.ok(state.paths[0].points.filter(p=>p.anchorId==='a2').every(p=>p.xPx===810));
+});
+
+test('Java shared pose edits apply everywhere and executable references retain forks without comments', async () => {
+  const {path,g} = seedFork();
+  const artifact = buildExportArtifacts([],segmentConfig('java-class'));
+  const changed = artifact.content.replace(/(public final Pose segment1Point2 = segment1Poses.of\()[^,]+/, '$155.000000000');
+  assert.notEqual(changed,artifact.content);
+  await importWaypointsFromText(changed,'Edited.java');
+  const shared = path.points.filter(p=>p.anchorId==='a2');
+  assert.ok(shared.every(p=>Math.abs(collectPathData(true,{points:[p]})[0].x-55)<1e-7));
+  await importWaypointsFromText(changed.replace(/\/\/[^\r\n]*/g,''),'NoComments.java');
+  assert.equal(path.graph.anchors.length,g.anchors.length);
+  assert.equal(path.graph.sections.length,g.sections.length);
+});
+
+test('inconsistent graph input leaves the current geometry intact', async () => {
+  const {path,g} = seedFork();
+  const data = JSON.parse(buildExportArtifacts([],segmentConfig('json')).content);
+  data.segments[1].poses[0].x += 5;
+  await assert.rejects(importWaypointsFromText(JSON.stringify(data),'Bad.json'),/junction/);
+  assert.equal(path.graph,g);
+});

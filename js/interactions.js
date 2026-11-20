@@ -20,6 +20,7 @@ import {
 import { normalize } from './utils.js';
 import { canonicalToHeading, syncConfigUI } from './field_config.js';
 import { fromMeters, toMeters } from './units.js';
+import { appendAnchor, bindGraph, canExtend, focusedRoute } from './branch_graph.js';
 import { createAnchor, removeAnchor, removeControlPoint, MAX_PATH_POINTS } from './path_model.js';
 import { addPathSegment, ensurePathSegments, focusPointSegment, pointInsertionIndex } from './segment_model.js';
 import { updateTable, syncSelectedUI, refreshDraggedRow } from './ui.js';
@@ -221,7 +222,7 @@ export function initInteractions() {
 
 function addPointAtCursor() {
   const path = state.paths[state.activePath];
-  if (!state.imgLoaded || path.points.length >= MAX_PATH_POINTS) return;
+  if (!state.imgLoaded || (path.graph?.anchors.length ?? path.points.length) >= MAX_PATH_POINTS) return;
   const { imgRect } = layout();
   const within = pointWithinImage(state.lastMouse, imgRect);
   const canvasPoint = within
@@ -229,6 +230,7 @@ function addPointAtCursor() {
     : { x: imgRect.x + imgRect.w / 2, y: imgRect.y + imgRect.h / 2 };
   const imagePoint = canvasToImagePx(canvasPoint.x, canvasPoint.y);
   let segments = ensurePathSegments(path);
+  if (path.graph && !canExtend(path.graph,segments[path.activeSegment])) return;
   const insertionIndex = isPedroPathingSelected() ? pointInsertionIndex(path) : path.points.length;
   const heading = insertionIndex > 0 ? path.points[insertionIndex - 1].headingRad : 0;
 
@@ -241,8 +243,15 @@ function addPointAtCursor() {
   point.segmentId = isPedroPathingSelected()
     ? (segments[path.activeSegment] || segments[segments.length - 1]).id
     : path.points[path.points.length - 1]?.segmentId || segments[0].id;
-  path.points.splice(insertionIndex, 0, point);
-  state.selected = insertionIndex;
+  if (path.graph) {
+    const s = path.segments[path.activeSegment];
+    appendAnchor(path.graph,s,point);
+    bindGraph(path);
+    state.selected = path.points.findLastIndex(p => p.segmentId === s.id);
+  } else {
+    path.points.splice(insertionIndex, 0, point);
+    state.selected = insertionIndex;
+  }
   state.selectedControl = null;
   if (path.previewEnabled && path.previewIndex === path.points.length - 2) {
     path.previewIndex = path.points.length - 1;
@@ -254,12 +263,18 @@ function addPointAtCursor() {
 
 function duplicateSelectedAnchor(path) {
   const source = path.points[state.selected];
-  if (!source || path.points.length >= MAX_PATH_POINTS) return;
+  if (!source || (path.graph?.anchors.length ?? path.points.length) >= MAX_PATH_POINTS) return;
   ensurePathSegments(path);
   pushHistory();
   const duplicate = createAnchor(source.xPx, source.yPx, source.headingRad, false, source.controlPoints, source.headingMode, source.constantHeadingRad);
   duplicate.segmentId = source.segmentId;
-  path.points.splice(state.selected + 1, 0, duplicate);
+  if (path.graph) {
+    const s = path.segments.find(s => s.id === source.segmentId);
+    const index = s.steps.findIndex(p => p.anchorId === source.anchorId);
+    if (index === s.steps.length - 1 && !canExtend(path.graph,s)) return;
+    appendAnchor(path.graph,s,duplicate,index+1);
+    bindGraph(path);
+  } else path.points.splice(state.selected + 1, 0, duplicate);
   state.selected += 1;
   state.selectedControl = null;
   syncSelectedUI();
@@ -297,6 +312,7 @@ function hitTest(canvasX, canvasY) {
 
   if (isPedroPathingSelected()) {
     for (let pointIndex = path.points.length - 1; pointIndex >= 1; pointIndex--) {
+      if (path.graph && state.selected !== pointIndex) continue;
       const controls = path.points[pointIndex].controlPoints || [];
       for (let controlIndex = controls.length - 1; controlIndex >= 0; controlIndex--) {
         const canvasPoint = imagePxToCanvas(controls[controlIndex].xPx, controls[controlIndex].yPx);
@@ -307,8 +323,16 @@ function hitTest(canvasX, canvasY) {
     }
   }
 
-  for (let index = path.points.length - 1; index >= 0; index--) {
+  const indices = path.points.map((_,index) => index).reverse();
+  let visible;
+  if (path.graph) {
+    const active = path.segments[path.activeSegment];
+    visible = new Set(focusedRoute(path.graph,active).map(s => s.id));
+    indices.sort((a,b) => Number(path.points[b].segmentId === active.id) - Number(path.points[a].segmentId === active.id));
+  }
+  for (const index of indices) {
     const point = path.points[index];
+    if (visible && !visible.has(point.segmentId)) continue;
     const canvasPoint = imagePxToCanvas(point.xPx, point.yPx);
     const angle = headingToCanvasAngle(point.headingRad);
     const handle = {

@@ -15,6 +15,7 @@ export function samePose(a, b) {
 }
 
 export function ensurePathSegments(path) {
+  if (path.graph) return path.graph.sections;
   if (!path.segments?.length) {
     path.segments = path.points.length ? [{ id: 'segment1', name: 'Segment 1' }] : [];
   }
@@ -31,6 +32,7 @@ export function ensurePathSegments(path) {
 
 export function getSegmentPoints(path, segmentId) {
   ensurePathSegments(path);
+  if (path.graph) return path.points.filter(p => p.segmentId === segmentId);
   const first = path.points.findIndex(point => point.segmentId === segmentId);
   if (first < 0) return [];
   const points = path.points.filter(point => point.segmentId === segmentId);

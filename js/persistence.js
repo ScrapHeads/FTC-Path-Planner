@@ -1,3 +1,4 @@
+import { bindGraph, pathDocument } from './branch_graph.js';
 import { state } from './state.js';
 import { normalizeZones } from './exclusion_model.js';
 
@@ -33,7 +34,8 @@ export function saveAppState() {
       if (element) controls[id] = element.type === 'checkbox' ? element.checked : element.value;
     }
     const workspace = Object.fromEntries(STATE_KEYS.map(key => [key, state[key]]));
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, workspace, controls }));
+    workspace.paths = state.paths.map(pathDocument);
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 2, workspace, controls }));
     return true;
   } catch (error) {
     reportStorageError(error);
@@ -46,7 +48,9 @@ export function restoreAppState() {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const saved = JSON.parse(raw);
-    if (saved.version !== 1 || !validWorkspace(saved.workspace)) return null;
+    if (![1,2].includes(saved.version) || !Array.isArray(saved.workspace?.paths)) return null;
+    for (const path of saved.workspace.paths) if (path?.graph) bindGraph(path);
+    if (!validWorkspace(saved.workspace)) return null;
     for (const key of STATE_KEYS) {
       if (Object.hasOwn(saved.workspace, key)) state[key] = saved.workspace[key];
     }

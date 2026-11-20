@@ -10,6 +10,7 @@ export const PEDRO_IMPORTS = [
 
 export function buildPedroJavaSegments(segments) {
   const names = segmentMethodNames(segments);
+  const shared = new Map();
   return segments.map((segment, index) => {
     const name = names[index];
     const lines = [
@@ -20,8 +21,11 @@ export function buildPedroJavaSegments(segments) {
     const controlNames = [];
     segment.points.forEach((point, pointIndex) => {
       const anchor = `${name}Point${pointIndex + 1}`;
-      anchorNames.push(anchor);
-      lines.push(`public final Pose ${anchor} = ${name}Poses.of(${number(point.x)}, ${number(point.y)}, ${number(point.headingRad * 180 / Math.PI)}); // role=anchor anchor=${pointIndex} locked=${!!point.locked}`);
+      const id = segment.anchorIds?.[pointIndex];
+      const existing = shared.get(id);
+      anchorNames.push(existing || anchor);
+      if (id) shared.set(id, existing || anchor);
+      if (!existing) lines.push(`public final Pose ${anchor} = ${name}Poses.of(${number(point.x)}, ${number(point.y)}, ${number(point.headingRad * 180 / Math.PI)}); // role=anchor anchor=${pointIndex} locked=${!!point.locked}`);
       controlNames[pointIndex] = (pointIndex ? point.controlPoints || [] : []).map((control, controlIndex) => {
         const controlName = `${name}Control${pointIndex + 1}_${controlIndex + 1}`;
         lines.push(`private final Pose ${controlName} = ${name}Poses.of(${number(control.x)}, ${number(control.y)}, 0.000000000); // role=control anchor=${pointIndex} control=${controlIndex} locked=${!!control.locked}`);
@@ -42,6 +46,7 @@ export function buildPedroJavaSegments(segments) {
       const expression = paths.length === 1 ? paths[0] : `Paths.path(\n        ${paths.join(',\n        ')}\n    )`;
       lines.push('', `public Path ${name}() {`, `    return ${expression};`, '}');
     } else {
+      if (anchorNames.length && segment.anchorIds) lines.push('// plannerSingle=' + anchorNames[0]);
       lines.push(`// Add at least two anchors to generate ${name}().`);
     }
     lines.push('// endPlannerSegment');
@@ -52,6 +57,7 @@ export function buildPedroJavaSegments(segments) {
 // Parse executable factory expressions and path references; comments only supply labels and locks.
 export function parsePedroJavaSegments(text) {
   if (!/PoseFactory\s+\w+\s*=/.test(text)) return null;
+  const graphFile = /^\s*\/\/\s*graph=/m.test(text);
   const poses = new Map();
   const factories = new Map();
   const factoryPattern = /PoseFactory\s+(\w+)\s*=\s*PoseFactory\.(degrees|radians)\s*\(\s*\)((?:\s*\.mirror[XY]\s*\(\s*[-+\d.eE]+\s*\))*)\s*;/g;
@@ -68,11 +74,17 @@ export function parsePedroJavaSegments(text) {
       if (mirror[1] === 'X') { pose.x = 2 * Number(mirror[2]) - pose.x; pose.headingRad = Math.PI - pose.headingRad; }
       else { pose.y = 2 * Number(mirror[2]) - pose.y; pose.headingRad = -pose.headingRad; }
     }
+    if (poses.has(match[1])) throw Error('Duplicate pose declaration: ' + match[1]);
     poses.set(match[1], pose);
   }
 
   function readPaths(body) {
     const points = [];
+    if (graphFile && /public\s+Path\b/.test(body)) {
+      const expression = body.match(/public\s+Path\s+\w+\s*\(\s*\)\s*\{\s*return\s+([^;]+);\s*\}/)?.[1];
+      const calls = expression?.replace(/Paths\.(line|curve)\s*\([^()]*\)\s*\.(linear|constant|tangent)\s*\([^()]*\)/g,'edge').trim();
+      if (!(calls === 'edge' || /^Paths\.path\(\s*edge(?:\s*,\s*edge)*\s*\)$/.test(calls))) throw Error('Unsupported Pedro graph path expression.');
+    }
     let previousEnd;
     for (const match of body.matchAll(/Paths\.(line|curve)\s*\(([^()]*)\)/g)) {
       const references = match[2].split(',').map(value => value.trim());
@@ -80,7 +92,7 @@ export function parsePedroJavaSegments(text) {
       const entries = references.map(reference => {
         const pose = poses.get(reference);
         if (!pose) throw new Error(`Unknown pose reference: ${reference}.`);
-        return { ...pose, controlPoints: [] };
+        return { ...pose, poseReference: reference, controlPoints: [] };
       });
       if (previousEnd && previousEnd !== references[0]) throw new Error('A segment contains disconnected paths.');
       if (!points.length) points.push(entries[0]);
@@ -88,6 +100,7 @@ export function parsePedroJavaSegments(text) {
       end.controlPoints = entries.slice(1, -1);
       const interpolation = body.slice(match.index + match[0].length).match(/^\s*\.(linear|tangent|constant)\s*\(([^()]*)\)/);
       const mode = interpolation?.[1] || 'tangent';
+      if (graphFile && mode === 'linear' && interpolation[2].replace(/\s/g,'') !== [references[0],references.at(-1)].join(',')) throw Error('Unsupported linear heading references.');
       if (mode !== 'linear') end.headingMode = mode;
       if (mode === 'constant') {
         const argument = interpolation[2].trim();
@@ -106,6 +119,8 @@ export function parsePedroJavaSegments(text) {
   for (const match of text.matchAll(groupPattern)) {
     const metadata = JSON.parse(match[1]);
     const points = readPaths(match[2]);
+    const single = match[2].match(/\/\/ plannerSingle=(\w+)/);
+    if (single && !points.length && poses.has(single[1])) points.push({ ...poses.get(single[1]), poseReference: single[1], controlPoints: [] });
     if (!points.length) {
       for (const declaration of match[2].matchAll(posePattern)) {
         if (!/role=control\b/.test(declaration[0])) points.push({ ...poses.get(declaration[1]), controlPoints: [] });

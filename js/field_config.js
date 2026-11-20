@@ -183,9 +183,10 @@ export function setCoordinateSystem(coordinateSystem, { preserveHeading = true }
 
   if (preserveHeading) {
     state.paths.forEach(path => {
+      for (const point of path.graph?.anchors || path.points) {
+        point.headingRad = canonicalToHeading(headingToCanonical(point.headingRad, previous), coordinateSystem);
+      }
       path.points.forEach(point => {
-        const canonical = headingToCanonical(point.headingRad, previous);
-        point.headingRad = canonicalToHeading(canonical, coordinateSystem);
         if (Number.isFinite(point.constantHeadingRad)) {
           point.constantHeadingRad = canonicalToHeading(headingToCanonical(point.constantHeadingRad, previous), coordinateSystem);
         }
@@ -202,9 +203,10 @@ export function applyPresetConfig(value) {
   const previousSystem = state.fieldConfig.coordinateSystem;
 
   state.paths.forEach(path => {
+    for (const point of path.graph?.anchors || path.points) {
+      point.headingRad = canonicalToHeading(headingToCanonical(point.headingRad,previousSystem),preset.coordinateSystem);
+    }
     path.points.forEach(point => {
-      const canonical = headingToCanonical(point.headingRad, previousSystem);
-      point.headingRad = canonicalToHeading(canonical, preset.coordinateSystem);
       if (Number.isFinite(point.constantHeadingRad)) {
         point.constantHeadingRad = canonicalToHeading(headingToCanonical(point.constantHeadingRad, previousSystem), preset.coordinateSystem);
       }

@@ -148,6 +148,15 @@
       </div>
 
       <div id="segmentControls" hidden>
+        <div id="branchActions">
+          <div class="row"><button data-branch="fork">Branch from anchor</button><button data-branch="insert">Insert midpoint</button></div>
+          <div class="row"><button data-branch="duplicate">Duplicate branch</button><button data-branch="delete">Delete branch</button></div>
+          <button data-branch="finish">Finish independently</button>
+          <div class="row"><select id="joinTarget" aria-label="Rejoin anchor"></select><button data-branch="join">Rejoin here</button></div>
+          <label>Section color <input type="color" id="sectionColor"></label>
+          <label><input id="allBranches" type="checkbox"> All branches</label>
+          <div id="routeChoices" class="row"></div>
+        </div>
         <label for="segmentSelect">Segments in selected path</label>
         <select id="segmentSelect" aria-label="Active segment"></select>
         <div class="toolbar" style="margin-top:8px">
@@ -181,7 +190,7 @@
         <button id="movePointSegment" style="margin-top:8px">Move selected point</button>
         <p id="pointMoveStatus" class="small" aria-live="polite"></p>
         <p id="segmentStatus" class="small" aria-live="polite"></p>
-        <p class="small">Press N to add points to the selected segment. Split at an interior anchor to label parts of this path. Reorder segments with the up/down buttons; each starts at the previous segment's endpoint, keeping the auto's starting pose fixed. Select an anchor on the field or in the table to move it to another segment; it appends with its control points. Export creates one Java class for the selected path only. Removing a label keeps its points in the neighboring segment.</p>
+        <p id="legacySegmentHelp" class="small">Press N to add points to the selected segment. Split at an interior anchor to label parts of this path. Reorder segments with the up/down buttons; each starts at the previous segment's endpoint, keeping the auto's starting pose fixed. Select an anchor on the field or in the table to move it to another segment; it appends with its control points. Export creates one Java class for the selected path only. Removing a label keeps its points in the neighboring segment.</p>
       </div>
 
       <div class="list" style="margin-top:8px">
