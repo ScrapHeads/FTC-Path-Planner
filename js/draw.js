@@ -1,9 +1,11 @@
+import { sectionColor } from './route_diagram.js';
+import { refreshWorkspace } from './workspace.js';
 import { ctx, dpi, els, getMeasurementUnit, isPedroPathingSelected } from './els.js';
 import { state, PATH_COLORS } from './state.js';
 import { layout, withCanvasLayout, imagePxToCanvas, pxToField, headingToCanvasAngle } from './layout.js';
 import { doExport } from './io_export.js';
 import { sampleSegment, evaluateBezier } from './path_model.js';
-import { focusedRoute, outgoing, incoming, startId, endId } from './branch_graph.js';
+import { focusedRoute, outgoing, incoming } from './branch_graph.js';
 import { ensurePathSegments, getSegmentPoints } from './segment_model.js';
 import { drawExclusionBox } from './exclusion_zone.js';
 import { collisionReport } from './collision_state.js';
@@ -20,6 +22,11 @@ export function draw(options = {}) {
         drawExclusionBox();
         drawPathsAndPoints();
         drawHoverLabel();
+        if (state.branchPlacement?.mainPoint) {
+          const {anchor, mainPoint, main} = state.branchPlacement;
+          drawSegment(anchor, mainPoint, main.color, false, false);
+          drawForkLabel(mainPoint, 'Main', main.color);
+        }
       } else {
         ctx.fillStyle = '#101820';
         ctx.fillRect(imgRect.x, imgRect.y, imgRect.w, imgRect.h);
@@ -32,6 +39,7 @@ export function draw(options = {}) {
       if (state.hudVisible) drawHUD();
       if (options.updateExport ?? !state.dragMode) doExport();
     });
+    refreshWorkspace();
   } catch (error) {
     console.error('Render error', error);
   }
@@ -59,6 +67,7 @@ function drawPathsAndPoints() {
       drawGraph(path,pathIndex,collisions);
       return;
     }
+    const colors = new Map((controlsEnabled ? path.segments || [] : []).map(s => [s.id,s.color]));
     const visibleCount = path.previewEnabled
       ? Math.max(0, Math.min(path.points.length, path.previewIndex + 1))
       : path.points.length;
@@ -67,16 +76,16 @@ function drawPathsAndPoints() {
       if (path.points[endIndex].breakBefore) continue;
       const outsideSegment = focusedPoints && (pathIndex !== state.activePath || path.points[endIndex].segmentId !== selectedSegment.id);
       const dimmed = endIndex >= visibleCount || outsideSegment;
-      drawSegment(path.points[endIndex - 1], path.points[endIndex], path.color, dimmed, controlsEnabled);
+      drawSegment(path.points[endIndex - 1], path.points[endIndex], colors.get(path.points[endIndex].segmentId) || path.color, dimmed, controlsEnabled);
       if (collisions.connections[endIndex]) drawCollisionIntervals(path.points[endIndex - 1], path.points[endIndex], collisions.connections[endIndex], controlsEnabled);
-      if (controlsEnabled && pathIndex === state.activePath) drawControlPolygon(path, endIndex, dimmed);
+      if (controlsEnabled && pathIndex === state.activePath && state.selected === endIndex) drawControlPolygon(path, endIndex, dimmed);
     }
 
     path.points.forEach((point, pointIndex) => {
       const outsideSegment = focusedPoints && (pathIndex !== state.activePath || !focusedPoints.has(point));
       const future = pointIndex >= visibleCount;
-      drawAnchor(path, pathIndex, point, pointIndex, future || outsideSegment, collisions.anchors[pointIndex]?.length > 0, collisions.headings[pointIndex]);
-      if (controlsEnabled && pathIndex === state.activePath) {
+      drawAnchor(path, pathIndex, point, pointIndex, future || outsideSegment, collisions.anchors[pointIndex]?.length > 0, collisions.headings[pointIndex], colors.get(point.segmentId));
+      if (controlsEnabled && pathIndex === state.activePath && state.selected === pointIndex) {
         // Controls belong to the incoming connection, including at shared anchors.
         drawControls(path, pointIndex, future || (selectedSegment && point.segmentId !== selectedSegment.id));
       }
@@ -95,19 +104,26 @@ function drawGraph(path,pathIndex,collisions) {
   for (const s of g.sections) {
     const points = getSegmentPoints(path,s.id);
     const focused = visible.has(s.id);
-    const common = outgoing(g,endId(s)).length > 1 || incoming(g,startId(s)).length > 1;
+    const color = sectionColor(path,s);
     for (let i=1;i<points.length;i++) {
       const p = points[i], index = path.points.indexOf(p);
-      drawSegment(points[i-1],p,common ? '#cbd5e1' : s.color,!(compare || focused && shown.has(p.anchorId)),true,true);
+      drawSegment(points[i-1],p,color,!(compare || focused && shown.has(p.anchorId)) || pathIndex !== state.activePath,true,true, s === current && pathIndex === state.activePath);
       if (focused && collisions.connections[index]) drawCollisionIntervals(points[i-1],p,collisions.connections[index],true);
       if (s === current && pathIndex === state.activePath && index === state.selected) {
         drawControlPolygon(path,index,false); drawControls(path,index,false);
       }
     }
   }
+  if (pathIndex === state.activePath) {
+    for (const s of g.sections) {
+      if (s.steps.length < 2 || outgoing(g,s.steps[0].anchorId).length < 2) continue;
+      const point = getSegmentPoints(path,s.id)[1];
+      drawForkLabel(point, s.name, s.color);
+    }
+  }
   const drawn = new Set();
   for (const p of [...path.points].sort((a,b) => Number(b.segmentId === current?.id)-Number(a.segmentId === current?.id))) {
-    if (drawn.has(p.anchorId) || !visible.has(p.segmentId)) continue;
+    if (drawn.has(p.anchorId) || !compare && !visible.has(p.segmentId)) continue;
     drawn.add(p.anchorId);
     const i = path.points.indexOf(p);
     drawAnchor(path,pathIndex,p,i,!shown.has(p.anchorId),!!collisions.anchors[i]?.length,collisions.headings[i]);
@@ -125,6 +141,18 @@ function drawGraph(path,pathIndex,collisions) {
   }
 }
 
+function drawForkLabel(point, name, color) {
+  const {x,y} = imagePxToCanvas(point.xPx,point.yPx);
+  ctx.save();
+  ctx.font = (12*dpi) + 'px sans-serif';
+  const labelWidth = ctx.measureText(name).width + 10*dpi;
+  ctx.fillStyle = '#132031';
+  ctx.fillRect(x+7*dpi,y+6*dpi,labelWidth,18*dpi);
+  ctx.fillStyle = color || '#dbeafe';
+  ctx.fillText(name,x+12*dpi,y+19*dpi);
+  ctx.restore();
+}
+
 const geometryCache = new WeakMap();
 function segmentGeometry(start, end, controlsEnabled) {
   const controls = controlsEnabled ? end.controlPoints || [] : [];
@@ -137,11 +165,11 @@ function segmentGeometry(start, end, controlsEnabled) {
   return geometry;
 }
 
-function drawSegment(start, end, color, isFuture, controlsEnabled, thin = false) {
+function drawSegment(start, end, color, isFuture, controlsEnabled, thin = false, emphasized = false) {
   const { samples } = segmentGeometry(start, end, controlsEnabled);
   ctx.save();
   ctx.strokeStyle = isFuture ? 'rgba(148, 163, 184, 0.45)' : color;
-  ctx.lineWidth = (thin && isFuture ? 1 : 3) * dpi;
+  ctx.lineWidth = (thin && isFuture ? 1 : emphasized ? 5 : 3) * dpi;
   if (isFuture) ctx.setLineDash([7 * dpi, 6 * dpi]);
   ctx.beginPath();
   samples.forEach((sample, index) => {
@@ -219,14 +247,14 @@ function drawCollisionIntervals(start, end, intervals, controlsEnabled) {
   ctx.restore();
 }
 
-function drawAnchor(path, pathIndex, point, pointIndex, isFuture, collides = false, expectedHeading) {
+function drawAnchor(path, pathIndex, point, pointIndex, isFuture, collides = false, expectedHeading, segmentColor) {
   const canvasPoint = imagePxToCanvas(point.xPx, point.yPx);
   const selected = pathIndex === state.activePath && pointIndex === state.selected && !state.selectedControl;
-  const color = collides ? '#ef4444' : path.color || PATH_COLORS[pathIndex] || '#94a3b8';
+  const color = collides ? '#ef4444' : segmentColor || path.color || PATH_COLORS[pathIndex] || '#94a3b8';
   const angle = headingToCanvasAngle(point.headingRad);
 
   const footprintAngle = Number.isFinite(expectedHeading) ? -expectedHeading : angle;
-  if (!isFuture || collides) drawRobotFootprint(canvasPoint, footprintAngle, color, point.locked && !collides, collides);
+  if (selected || collides || path.previewEnabled && !isFuture) drawRobotFootprint(canvasPoint, footprintAngle, color, point.locked && !collides, collides);
 
   const radius = 6 * dpi;
   ctx.fillStyle = collides ? '#ef4444' : isFuture ? 'rgba(226, 232, 240, 0.35)' : (selected ? '#a78bfa' : color);
@@ -237,6 +265,11 @@ function drawAnchor(path, pathIndex, point, pointIndex, isFuture, collides = fal
   ctx.lineWidth = 2 * dpi;
   ctx.stroke();
 
+  if (!selected) return;
+  ctx.beginPath();
+  ctx.arc(canvasPoint.x, canvasPoint.y, radius + 3*dpi, 0, Math.PI*2);
+  ctx.strokeStyle = "#fff";
+  ctx.stroke();
   const handleLength = 28 * dpi;
   const handleX = canvasPoint.x + Math.cos(angle) * handleLength;
   const handleY = canvasPoint.y + Math.sin(angle) * handleLength;

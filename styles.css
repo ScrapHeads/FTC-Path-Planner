@@ -1,42 +1,5 @@
 :root{--bg:#0b0f14;--panel:#121821;--muted:#90a4ae;--text:#e6edf3;--accent:#7dd3fc;--accent2:#a78bfa;--danger:#ef4444}
 
-/* Page never scrolls; left panel will handle its own Y scroll */
-html, body {
-  height: 100%;
-  margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font: 14px/1.35 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial;
-  overflow: hidden;            /* prevent page scroll */
-}
-
-/* Two columns: fixed config width, canvas fills the rest */
-.app{
-  display: grid;
-  grid-template-columns: 560px 1fr;  /* fixed config width */
-  gap: 14px;
-  height: 100vh;                     /* full viewport height */
-}
-
-.left{
-  background: var(--panel);
-  padding: 17px;
-  box-sizing: border-box;
-  overflow-y: auto;                  /* left column scrolls */
-  overflow-x: hidden;
-}
-
-.right{
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 14px;
-  box-sizing: border-box;
-  height: 100vh;                     /* fixed to viewport */
-  overflow: hidden;                  /* no scroll on canvas column */
-  min-height: 0;
-}
-
   .exclusion-controls {
     flex-shrink: 0;
     min-width: 0;
@@ -266,3 +229,163 @@ button:disabled{opacity:.45;cursor:default}
 #branchActions .row { margin: 0; }
 #routeChoices:empty { display: none; }
 .graph-editing :is(#addSegment,#deleteSegment,#pointAsSegment,#pointSegmentTarget,#movePointSegment,#pointMoveStatus,#legacySegmentHelp,label[for="pointSegmentTarget"]) { display: none; }
+
+:root { color-scheme:dark; --bg:#0d1420; --panel:#151e2c; --line:#334154; --muted:#a4b4c7; --accent:#85baff }
+* { box-sizing:border-box }
+body { margin:0; background:var(--bg); color:var(--text); font:14px/1.45 system-ui,"Segoe UI",sans-serif; height:100dvh; display:flex; flex-direction:column }
+button, input, select { border-radius:5px; border-color:var(--line); font:inherit; max-width:100% }
+button { padding:6px 10px; background:#1a2637 }
+button:hover:enabled,summary:hover { color:white; background:#273950 }
+:focus-visible { outline:2px solid var(--accent); outline-offset:2px }
+.topbar,.file-tools,.toolgroup,.fieldbar,.dockbar,.graph-tools,dialog header { display:flex; align-items:center; gap:7px }
+.topbar { flex-wrap:wrap; background:#111a28; border-bottom:1px solid var(--line); padding:9px 14px; z-index:1 }
+.topbar h1 { margin:0 10px 0 0; font-size:17px; letter-spacing:-.035em }
+.file-tools { margin-left:auto }
+.primary { background:#244875; border-color:#487db8 }
+.workspace { flex:1; min-height:0; display:flex }
+.field-column { flex:1; min-width:0; display:flex; flex-direction:column }
+.fieldbar,.dockbar { min-height:38px; padding:4px 12px; background:#131d2b; border-bottom:1px solid var(--line) }
+.fieldbar h2,#inspector>h2 { margin:0; font-size:14px; color:#c3d2e4 }
+#inspectToggle,#dockToggle { margin-left:auto }
+.canvasWrap { border:0; border-radius:0; background:#0e1724 }
+.empty-field { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%) }
+#inspector { flex:0 0 min(var(--inspector-width,400px),48vw); overflow:auto; background:var(--panel); border-left:1px solid var(--line); padding:16px }
+#inspector>h2 { border-bottom:1px solid var(--line); padding-bottom:12px; color:var(--accent) }
+#inspector h3 { margin:16px 0 4px }
+#editorHint,#emptyGraph { font-size:13px; color:var(--muted) }
+#inspector details { border-top:1px solid var(--line); margin-top:12px; padding:10px 0 }
+summary { cursor:pointer }
+#segmentControls { border:0; padding:0 }
+#inspector select,#inspector input:not([type=checkbox],[type=color]),dialog input:not([type=checkbox]),dialog select { width:100%; min-width:0 }
+.grid-2 { grid-template-columns:repeat(2,minmax(0,1fr)) }
+#divider { height:8px; border-block:1px solid var(--line); cursor:ns-resize; touch-action:none; background:#151f2e }
+#divider:after { content:''; display:block; width:34px; height:2px; margin:2px auto; background:#66798c }
+#dockBody { height:min(var(--panel-height,180px),46dvh); background:#101927 }
+.dockbar { flex-wrap:wrap; padding:4px 6px; gap:2px }
+#tablePanel .list { overflow:auto }
+#tablePanel table { min-width:450px }
+.dockbar button[aria-pressed] { border:0; border-bottom:2px solid transparent; background:transparent; border-radius:0 }
+.dockbar button[aria-pressed=true] { color:var(--accent); border-bottom-color:var(--accent) }
+#graphPanel,#tablePanel,.list { height:100%; max-height:none; position:relative }
+#graphPanel { display:flex; flex-direction:column }
+.graph-tools { flex-wrap:wrap; justify-content:flex-end; padding:4px 10px; font-size:12px; gap:4px }
+.graph-tools label { margin:0 auto 0 0 }
+#diagram { width:100%; flex:1; min-height:0; touch-action:none; background-image:radial-gradient(#29384d 1px,transparent 1px); background-size:16px 16px }
+#emptyGraph { position:absolute; top:53%; left:0; right:0; margin:0; text-align:center; pointer-events:none }
+.section-node { cursor:grab }
+.section-node rect:first-of-type { fill:#1c2a3c; stroke:#53657b }
+.section-node.active rect:first-of-type { stroke:#9ac7ff; stroke-width:3 }
+.section-node.dim { opacity:.63 }
+.section-node text { fill:#e6edf3; font:14px system-ui; pointer-events:none }
+.section-node text.warning,.warning { fill:#ffab87; color:#ffab87 }
+.wire,.wire-hit { fill:none; stroke:#91a2b8; stroke-width:2 }
+.wire-hit { stroke:transparent; stroke-width:14; cursor:pointer }
+.wire-hit:focus,.wire-hit:hover { stroke:#99bfff80; stroke-width:6 }
+dialog,[popover] { color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:20px; max-width:calc(100vw - 24px); max-height:85dvh; overflow:auto }
+dialog { width:550px }
+dialog::backdrop { background:#030811bb }
+dialog header { justify-content:space-between; border-bottom:1px solid var(--line); padding-bottom:10px }
+dialog header h2 { margin:0; color:var(--text); font-size:18px }
+.exclusion-controls { max-height:none; overflow:visible; margin-top:16px }
+[popover] { margin:0 auto; top:56px; width:320px }
+@media(max-width:760px) {
+  body { min-height:100dvh; height:auto }
+  .topbar { gap:5px; padding:7px }
+  .topbar h1 { font-size:15px }
+  .file-tools { margin-left:0 }
+  .workspace { flex-direction:column }
+  .field-column { order:-1 }
+  .field-column { flex:auto }
+  .canvasWrap { min-height:clamp(240px,49dvh,520px) }
+  #inspector { flex:auto; border:0; border-top:1px solid var(--line) }
+  .grid-2 { grid-template-columns:repeat(auto-fit,minmax(min(170px,100%),1fr)) }
+}
+
+#routesPanel { display:flex; flex-direction:column; flex:0 0 clamp(210px,23vw,340px); min-width:0; overflow:hidden; background:var(--panel); border-right:1px solid var(--line) }
+.nav-tabs { display:flex; border-bottom:1px solid var(--line); padding:6px 10px; gap:4px }
+.nav-tabs button { border:0; border-radius:7px; background:transparent; color:var(--muted) }
+.nav-tabs button[aria-pressed=true] { background:#24364b; color:#d9eaff }
+#routeList { flex:1; min-height:0; overflow:auto; display:grid; align-content:start; gap:3px; padding:10px }
+#routeList button { text-align:left; overflow-wrap:anywhere; background:transparent; border:1px solid transparent; border-radius:7px; margin-left:calc(var(--depth)*12px); padding:7px 8px }
+#routeList button[data-section]::before { content:''; display:inline-block; width:8px; height:8px; margin-right:8px; border-radius:50%; background:var(--route-color) }
+#routeList button:hover,#routeList button[aria-pressed=true] { background:#24364b }
+#routeList button[aria-pressed=true] { border-color:#577693 }
+#routeList small { color:var(--muted); display:block }
+#routeList .warning { margin-left:6px }
+#routeList p { color:var(--muted); font-size:13px; margin:4px }
+#inspectorDivider { flex:0 0 8px; background:#151f2e; border-inline:1px solid var(--line); touch-action:none; cursor:ew-resize; display:grid; place-items:center }
+#inspectorDivider::after { content:''; width:2px; height:36px; background:#66798c }
+#previewPanel { position:fixed; z-index:5; width:min(312px,calc(100vw - 12px)); max-height:calc(100dvh - 8px); overflow:auto; background:var(--panel); border:1px solid #50617b; border-radius:12px; box-shadow:0 12px 42px #0007 }
+#previewPanel header { display:flex; align-items:center; border-bottom:1px solid var(--line); background:#1c293b; padding-right:10px }
+#previewTitle { margin:0; padding:12px 14px; flex:1; color:var(--text); cursor:grab; user-select:none; touch-action:none }
+#previewTitle:active { cursor:grabbing }
+#previewPanel .panel-group { padding:8px 14px 14px }
+select { border-radius:8px; background-color:#192536; color:var(--text); padding:7px 10px }
+@supports (appearance:base-select) {
+  select, ::picker(select) { appearance:base-select }
+  select::picker-icon { color:var(--muted); transition:transform .12s }
+  select:open::picker-icon { transform:rotate(180deg) }
+  ::picker(select) { margin-block:4px; border:1px solid #45576e; border-radius:10px; padding:4px; background:#172231; color:var(--text); box-shadow:0 8px 24px #0006; max-height:min(360px,60dvh); overflow:auto }
+  option { padding:7px 10px; border-radius:6px; white-space:normal }
+  option:checked { background:#263e59 }
+  option:focus-visible, option:hover { background:#314863 }
+}
+@media (max-width:760px) {
+  #routesPanel { flex:auto; max-height:none; border-right:0 }
+  #routeList { flex:auto; max-height:35dvh }
+  #inspectorDivider { display:none }
+}
+
+.section-color { display:flex; align-items:center; gap:10px }
+#sectionColor { width:52px; height:30px; padding:3px; cursor:pointer }
+#sectionColor::-webkit-color-swatch-wrapper { padding:0 }
+#sectionColor::-webkit-color-swatch { border:none; border-radius:3px }
+#sectionColor::-moz-color-swatch { border:none; border-radius:3px }
+
+#exportDialog {
+  width:94vw;
+  height:92dvh;
+  max-height:calc(100dvh - 16px);
+  padding:clamp(12px,2vw,28px);
+}
+#exportDialog[open] { display:flex; flex-direction:column; gap:16px; overflow:hidden }
+.export-layout {
+  flex:1; min-height:0; display:grid; gap:20px;
+  grid-template-columns:minmax(270px,1fr) minmax(0,1.8fr);
+}
+.export-options { min-width:0; overflow:auto; padding:0 6px 4px 0 }
+.export-options .grid-2:first-child { grid-template-columns:minmax(0,1fr) }
+.export-options .custom-checkbox-label { display:block }
+.export-options .custom-checkbox-box { display:inline-flex; vertical-align:middle; margin-right:4px }
+.export-options .exclusion-toggle { margin-top:12px }
+.export-preview { display:flex; flex-direction:column; gap:6px; min-height:0; min-width:0 }
+.export-preview h3 { font-size:14px; margin:0 }
+#exportDialog #output { flex:1; min-height:0; max-height:none; margin:0; padding:12px }
+@media (max-width:760px) {
+  #exportDialog { width:calc(100vw - 16px); max-width:calc(100vw - 16px); height:calc(100dvh - 16px) }
+  .export-layout { display:block; overflow:auto }
+  .export-options { overflow:visible }
+  .export-preview { height:55dvh; min-height:200px; margin-top:16px }
+}
+
+.inspector-header,.inspector-heading { display:flex; align-items:center; justify-content:space-between; gap:8px }
+.inspector-header { padding-bottom:12px; border-bottom:1px solid var(--line) }
+.inspector-header h2 { margin:0; color:var(--accent) }
+#inspectorMode,.inspector-heading small { font-size:12px; color:var(--muted) }
+#inspector .inspector-group { margin:0; border:0; border-bottom:1px solid var(--line); padding:14px 0 }
+#inspector .inspector-group h3,#connectionControls h4 { margin:0 0 8px; font-size:15px }
+.inspector-heading label { margin:0 0 8px }
+.pose-grid,.section-identity { display:grid; gap:8px; align-items:end }
+.pose-grid { grid-template-columns:repeat(3,minmax(0,1fr)); margin-bottom:10px }
+.section-identity { grid-template-columns:minmax(0,1fr) auto; margin-top:10px }
+.section-identity input { display:block }
+.section-identity label { margin-bottom:0 }
+#sectionColor { height:36px }
+#connectionControls,.clear-paths { border-top:1px solid var(--line); margin-top:12px; padding-top:12px }
+#addHandle,#transforms .row + .row { margin-top:6px }
+#inspector #connectionControls details { border:0; padding:0; font-size:12px }
+#segmentStatus { white-space:pre-line }
+#pointMoveStatus:empty,#segmentStatus:empty { display:none }
+
+#placementNotice { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 12px; background:#203952; border-bottom:1px solid #456a8d; color:#ecf6ff }
+#placementNotice:not([hidden]) + .canvasWrap canvas { cursor:crosshair }

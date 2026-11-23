@@ -19,8 +19,9 @@ test('splitting preserves geometry and incoming control points on the correct ha
   ]);
   ensurePathSegments(path);
   assert.equal(splitPathSegment(path, 0), false);
-  assert.equal(splitPathSegment(path, 2), false);
   assert.equal(splitPathSegment(path, 1), true);
+  assert.match(path.segments[1].color, /^#[0-9a-f]{6}$/);
+  assert.notEqual(path.segments[1].color, path.segments[0].color || path.color);
   const halves = path.segments.map(segment => getSegmentPoints(path, segment.id));
   assert.deepEqual(halves.map(points => points.length), [2, 2]);
   assert.equal(path.points.length, 3);

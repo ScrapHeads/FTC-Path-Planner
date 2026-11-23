@@ -45,6 +45,7 @@ test('refresh restores all paths, controls, segments, map identity, selection an
     path.previewEnabled = true;
     path.previewIndex = 0;
   });
+  state.workspaceView = { height: 216, collapsed: true, tab: 'table', inspectorClosed: false, slots: { 2: { positions: { collect: { x: 18, y: 72 } }, camera: { x: 40, y: 16, k: 1.2 } } } };
   state.activePath = 2;
   state.selected = 0;
   state.selectedControl = { pointIndex: 0, controlIndex: 0 };

@@ -71,3 +71,16 @@ test('shared references do not consume extra anchors at the limit and invalid gr
   draft.steps.at(-1).anchorId='missing';
   assert.throws(()=>validateGraph(g),/Missing/);
 });
+
+test('explicit graph split picks a contrasting color even when all palette colors are in use', async () => {
+  const { promote } = await import('../js/branch_graph.js');
+  const { SECTION_COLORS } = await import('../js/segment_model.js');
+  const g = migrateGraph(createPath('Main', [0,10,20].map(x=>createAnchor(x,0))));
+  const parent = g.sections[0];
+  parent.color = SECTION_COLORS[0].toUpperCase();
+  for (const color of SECTION_COLORS.slice(1)) fork(g,'a1',color).color = color;
+  const child = promote(g,'a2',{recolor:true});
+  assert.notEqual(child.color, parent.color.toLowerCase());
+  assert.equal(parent.color, SECTION_COLORS[0].toUpperCase());
+  assert.equal(startId(child),endId(parent));
+});

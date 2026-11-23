@@ -15,7 +15,6 @@ import {
 } from './java_package.js';
 
 export function initExport() {
-  els.exportBtn.addEventListener('click', doExport);
   els.copyBtn.addEventListener('click', () => {
     doExport();
     const text = els.output.textContent || '';

@@ -1,7 +1,8 @@
+import { initWorkspace } from './workspace.js';
 import { els, canvas } from './els.js';
 import { setCanvasSize } from './layout.js';
 import { draw } from './draw.js';
-import { initUI, setActivePath, updateTable } from './ui.js';
+import { initUI, setActiveSegment, setActivePath, updateTable } from './ui.js';
 import { initInteractions } from './interactions.js';
 import { initImageIO, loadImage } from './io_image.js';
 import { initExport } from './io_export.js';
@@ -44,6 +45,7 @@ async function boot(){
   restoreControls(saved?.controls);
   els.javaType.dispatchEvent(new Event('change'));
   restoreControls(saved?.controls);
+  initWorkspace(setActiveSegment);
   initPersistence();
   requestAnimationFrame(draw);
 }

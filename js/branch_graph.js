@@ -1,7 +1,6 @@
 import { MAX_PATH_POINTS, headingSettings } from './path_model.js';
-import { ensurePathSegments, getSegmentPoints, segmentMethodNames } from './segment_model.js';
+import { ensurePathSegments, getSegmentPoints, segmentMethodNames, SECTION_COLORS, splitColor } from './segment_model.js';
 
-const colors = ['#38bdf8', '#fb923c', '#a78bfa', '#4ade80', '#f472b6'];
 const poseKeys = ['xPx', 'yPx', 'headingRad', 'locked'];
 function nextId(list, prefix) {
   const used = new Set(list.map(item => item.id));
@@ -20,7 +19,7 @@ function step(anchorId, point = {}) {
   return { anchorId, controlPoints: structuredClone(point.controlPoints || []), ...headingSettings(point) };
 }
 function section(graph, name, steps) {
-  const result = { id: nextId(graph.sections, 's'), name, color: colors[graph.sections.length % colors.length], steps };
+  const result = { id: nextId(graph.sections, 's'), name, color: SECTION_COLORS[graph.sections.length % SECTION_COLORS.length], steps };
   graph.sections.push(result);
   return result;
 }
@@ -39,7 +38,7 @@ export function migrateGraph(path) {
       if (!ids.has(point)) ids.set(point, addAnchor(graph, point));
       return step(ids.get(point), index ? point : {});
     });
-    graph.sections.push({ ...segment, color: segment.color || colors[graph.sections.length % colors.length], steps });
+    graph.sections.push({ ...segment, color: segment.color || SECTION_COLORS[graph.sections.length % SECTION_COLORS.length], steps });
   }
   return graph;
 }
@@ -103,12 +102,25 @@ export const startId = s => s.steps[0]?.anchorId;
 export const endId = s => s.steps.at(-1)?.anchorId;
 export function incoming(g,id) { return g.sections.filter(s => s.steps.length > 1 && endId(s) === id); }
 export function outgoing(g,id) { return g.sections.filter(s => startId(s) === id); }
-export function promote(g,id) {
+export function canStartSegment(g, owner, id) {
+  const index = owner?.steps.findIndex(p => p.anchorId === id) ?? -1;
+  return index > 0 && (index < owner.steps.length - 1 || (!owner.finished && !outgoing(g,id).length));
+}
+export function startSegment(g, owner, id) {
+  if (!canStartSegment(g,owner,id)) return;
+  if (endId(owner) !== id) return promote(g,id,{recolor:true});
+  const color = splitColor(owner.color || SECTION_COLORS[0], g.sections);
+  const next = section(g, unusedSectionName(g, owner.name + ' continuation'), [step(id)]);
+  next.color = color;
+  return next;
+}
+export function promote(g,id,{recolor = false} = {}) {
   for (const s of [...g.sections]) {
     const i = s.steps.findIndex(p => p.anchorId === id);
     if (i <= 0 || i === s.steps.length - 1) continue;
+    const color = recolor ? splitColor(s.color || SECTION_COLORS[0], g.sections) : s.color;
     const rest = section(g, s.name + ' continuation', [step(id), ...s.steps.splice(i+1)]);
-    rest.color = s.color;
+    rest.color = color;
     rest.finished = s.finished;
     s.finished = false;
     return rest;
@@ -119,6 +131,33 @@ export function fork(g,id,name) {
   promote(g,id);
   return section(g,name,[step(id)]);
 }
+function unusedSectionName(graph, base) {
+  const names = new Set(graph.sections.map(s => s.name));
+  let name = base;
+  for (let n = 2; names.has(name); n++) name = base + ' ' + n;
+  return name;
+}
+
+// Prepare only the private draft. The editor commits it after the last click.
+export function prepareFork(graph, owner, anchorId) {
+  const continuation = promote(graph, anchorId);
+  if (continuation) continuation.name = unusedSectionName(graph, 'Main');
+  const children = outgoing(graph, anchorId);
+  const needsMain = !children.some(s => s.steps.length > 1);
+  if (graph.anchors.length + (needsMain ? 2 : 1) > MAX_PATH_POINTS)
+    throw Error('This fork needs ' + (needsMain ? 'two free anchors.' : 'one free anchor.'));
+  let main;
+  if (needsMain) {
+    main = children[0] || fork(graph, anchorId, unusedSectionName(graph, 'Main'));
+    main.color = owner.color;
+  }
+  const mainRoute = main || continuation || children.find(s => s.id === graph.choices?.['main-out-' + anchorId]) || children[0];
+  graph.choices ||= {};
+  graph.choices['main-out-' + anchorId] = mainRoute.id;
+  const branch = fork(graph, anchorId, unusedSectionName(graph, 'Branch'));
+  return { graph, main, branch, anchor: graph.anchors.find(a => a.id === anchorId), mainPoint: null };
+}
+
 export function canExtend(g,s) {
   if (!s || s.finished) return false;
   if (s.steps.length < 2) return true;
@@ -131,9 +170,45 @@ export function validTargets(g,s) {
 }
 export function rejoin(g,s,id) {
   if (!validTargets(g,s).some(a => a.id === id)) throw Error('Choose a downstream anchor that keeps the route acyclic.');
-  promote(g,id);
+  const continuation = promote(g,id);
+  const parents = incoming(g,id);
+  const children = outgoing(g,id);
+  g.choices ||= {};
+  const mainParent = parents.find(p => p.id === g.choices['main-in-' + id]) || parents[0];
+  const mainChild = continuation || children.find(p => p.id === g.choices['main-out-' + id]) || children[0];
+  if (mainParent) g.choices['main-in-' + id] = mainParent.id;
+  if (mainChild) g.choices['main-out-' + id] = mainChild.id;
   s.steps.push(step(id));
 }
+// Every arrival has its own table row for the same pose. Anchor selection
+// resolves that row to the main continuation; Bézier controls keep their owner.
+export function focusRejoin(path, index) {
+  const g = path.graph, id = path.points[index]?.anchorId;
+  if (!g || !id) return index;
+  const parents = incoming(g,id);
+  if (parents.length < 2) return index;
+  g.choices ||= {};
+  const parent = parents.find(p => p.id === g.choices['main-in-' + id]) || parents[0];
+  const children = outgoing(g,id);
+  const main = children.find(p => p.id === g.choices['main-out-' + id]) || children[0] || parent;
+  g.choices['in-' + id] = parent.id;
+  selectRoute(g,main);
+  path.activeSegment = g.sections.indexOf(main);
+  return path.points.findIndex(p => p.anchorId === id && p.segmentId === main.id);
+}
+
+export function extendRejoinedEnd(path, id, point) {
+  const g = path.graph;
+  const main = section(g, unusedSectionName(g,'Main continuation'), [step(id)]);
+  main.color = path.segments[path.activeSegment].color;
+  appendAnchor(g,main,point);
+  g.choices['main-out-' + id] = main.id;
+  path.activeSegment = g.sections.indexOf(main);
+  selectRoute(g,main);
+  bindGraph(path);
+  return path.points.findLastIndex(p => p.segmentId === main.id);
+}
+
 export function appendAnchor(g,s,point,index = s.steps.length) {
   s.steps.splice(index,0,step(addAnchor(g,point),point));
 }

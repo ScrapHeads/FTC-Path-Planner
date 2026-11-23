@@ -124,7 +124,7 @@ test('adding to an earlier segment inserts points into that segment without addi
   state.paths[0].points = Array.from({ length: 5 }, (_, i) => createAnchor(i * 10, i * 10));
   ensurePathSegments(state.paths[0]);
   splitPathSegment(state.paths[0], 2);
-  state.paths[0].activeSegment = 0;
+  setActiveSegment(0);
   const nextSegmentStart = state.paths[0].points[3];
   key('n');
   assert.equal(state.paths.length, 1);
@@ -200,9 +200,9 @@ test('segment focus dims outside anchors, curves, and other autos while keeping 
   setActiveSegment(1);
   const dimAnchor = 'rgba(226, 232, 240, 0.35)';
   const dimConnection = 'rgba(148, 163, 184, 0.45)';
-  assert.deepEqual(drawing.anchors, [dimAnchor, dimAnchor, path.color, path.color, path.color, dimAnchor, dimAnchor]);
-  assert.deepEqual(drawing.controls, ['rgba(245, 158, 11, 0.35)', '#f59e0b']);
-  assert.deepEqual(drawing.connections, [dimConnection, dimConnection, path.color, path.color, dimConnection]);
+  assert.deepEqual(drawing.anchors, [dimAnchor, dimAnchor, path.color, path.segments[1].color, path.segments[1].color, dimAnchor, dimAnchor]);
+  assert.deepEqual(drawing.controls, []);
+  assert.deepEqual(drawing.connections, [dimConnection, dimConnection, path.segments[1].color, path.segments[1].color, dimConnection]);
   const rows = document.getElementById('pointRows').children;
   assert.equal(rows[0].classList.contains('dimmed-segment-row'), true);
   assert.equal(rows[2].classList.contains('dimmed-segment-row'), false);
@@ -218,8 +218,8 @@ test('All segments removes focus dimming and does not change generated Java', t 
   assert.equal(document.getElementById('output').textContent, exported);
   resetDrawing();
   setActiveSegment(-1);
-  assert.deepEqual(drawing.anchors, [...Array(5).fill(path.color), ...Array(2).fill('#81c784')]);
-  assert.deepEqual(drawing.controls, ['#f59e0b', '#f59e0b']);
+  assert.deepEqual(drawing.anchors, [...Array(3).fill(path.color), ...Array(2).fill(path.segments[1].color), ...Array(2).fill('#81c784')]);
+  assert.deepEqual(drawing.controls, []);
   assert.equal(document.getElementById('output').textContent, exported);
   assert.equal(path.segments.length, 2);
 });
@@ -308,10 +308,11 @@ test('clicking a shared anchor retains either selected segment, or chooses its o
   assert.equal(state.selected, 2);
 });
 
-test('a dimmed control selects its incoming segment first and allows dragging on the next press', t => {
+test('selecting the destination reveals its control for selection and dragging', t => {
   t.mock.method(console, 'error', (...args) => assert.fail(args.join(' ')));
   const path = seedSegmentFocus();
   setActiveSegment(1);
+  clickFieldPoint(path.points[2]);
   clickFieldPoint(path.points[2].controlPoints[0]);
   assert.equal(path.activeSegment, 0);
   assert.equal(document.getElementById('segmentSelect').value, '0');
@@ -325,7 +326,7 @@ test('heading handles and locked anchors select their segments without changing 
   t.mock.method(console, 'error', (...args) => assert.fail(args.join(' ')));
   const path = seedSegmentFocus();
   setActiveSegment(0);
-  clickFieldPoint(path.points[3], true);
+  clickFieldPoint(path.points[3]);
   assert.equal(path.activeSegment, 1);
   assert.equal(state.selected, 3);
   assert.equal(state.dragMode, null);
@@ -355,11 +356,12 @@ for (const entity of ['anchor', 'control', 'handle']) {
     const path = seedSegmentFocus();
     setActiveSegment(0);
     const point = entity === 'control' ? path.points[3].controlPoints[0] : path.points[3];
+    if (entity === 'control') clickFieldPoint(path.points[3]);
     const before = JSON.parse(JSON.stringify(path.points));
     const historyCount = state._history.length;
     const position = imagePxToCanvas(point.xPx, point.yPx);
     const offset = entity === 'handle' ? 28 : 0;
-    clickFieldPoint(point, entity === 'handle');
+    clickFieldPoint(point);
     listeners.get('mousemove')({ clientX: position.x + offset + 20, clientY: position.y - 20, shiftKey: false });
     listeners.get('mouseup')({});
     assert.equal(state.dragMode, null);
@@ -373,3 +375,194 @@ for (const entity of ['anchor', 'control', 'handle']) {
     if (state._hoverTimer) clearTimeout(state._hoverTimer);
   });
 }
+
+test('N edits the selected section after a fork while preserving the shared junction', async () => {
+  const { migrateGraph, bindGraph, fork, endId, startId } = await import('../js/branch_graph.js');
+  seed();
+  const path = state.paths[0] = createPath('Original', [0, 10, 20, 30].map(x => createAnchor(x, x)));
+  const graph = migrateGraph(path);
+  const trunk = graph.sections[0];
+  const junction = trunk.steps[1].anchorId;
+  const branch = fork(graph, junction, 'Alternative');
+  const continuation = graph.sections[1];
+  bindGraph(path, graph);
+
+  setActiveSegment(0);
+  key('n');
+  assert.equal(trunk.steps.length, 3);
+  assert.equal(endId(trunk), junction);
+  assert.equal(path.points[state.selected].anchorId, trunk.steps[1].anchorId);
+  assert.equal(startId(continuation), junction);
+  assert.equal(startId(branch), junction);
+
+  setActiveSegment(1);
+  const count = continuation.steps.length;
+  key('n');
+  assert.equal(continuation.steps.length, count + 1);
+  assert.equal(path.points[state.selected].anchorId, endId(continuation));
+  const originalEnd = endId(continuation);
+  const first = path.points.findIndex(p => p.segmentId === continuation.id);
+  setActiveSegment(1, first);
+  key('n');
+  assert.equal(state.selected, first + 1);
+  assert.equal(continuation.steps[1].anchorId, path.points[state.selected].anchorId);
+  assert.equal(endId(continuation), originalEnd);
+  assert.equal(branch.steps.length, 1);
+});
+
+for (const library of ['pedro','rr']) {
+  test(library + ' N inserts repeatedly after the selected anchor inside an ordinary segment', () => {
+    seed();
+    const path = state.paths[0] = createPath('Original', [0,10,20,30,40].map(x => createAnchor(x,x)));
+    ensurePathSegments(path);
+    splitPathSegment(path,2);
+    document.getElementById('javaType').value = library;
+    setActiveSegment(library === 'rr' ? 1 : 0, 1);
+    const original = [...path.points];
+    key('n');
+    assert.equal(state.selected, 2);
+    assert.equal(path.points[2].segmentId, original[1].segmentId);
+    key('n');
+    assert.equal(state.selected, 3);
+    assert.deepEqual(path.points.slice(4), original.slice(2));
+  });
+}
+
+for (const branched of [false, true]) {
+  test('starting a segment at an endpoint shares the anchor and N extends the new segment (graph=' + branched + ')', async () => {
+    seed();
+    const path = state.paths[0] = createPath('Auto', [0,10,20].map(x => createAnchor(x,x)));
+    const {bindGraph, migrateGraph, startSegment} = await import('../js/branch_graph.js');
+    const {getSegmentPoints} = await import('../js/segment_model.js');
+    if (branched) {
+      bindGraph(path, migrateGraph(path));
+      const owner = path.segments[0];
+      startSegment(path.graph,owner,owner.steps.at(-1).anchorId);
+      bindGraph(path);
+      setActiveSegment(1,3);
+    } else {
+      assert.ok(splitPathSegment(path,2));
+      setActiveSegment(1,2);
+      assert.equal(splitPathSegment(path,2), false);
+    }
+    const [original, continuation] = path.segments;
+    assert.equal(getSegmentPoints(path,continuation.id).length, 1);
+    assert.notEqual(continuation.color, original.color || path.color);
+    key('n');
+    assert.equal(getSegmentPoints(path,original.id).length, 3);
+    assert.equal(getSegmentPoints(path,continuation.id).length, 2);
+    assert.equal(path.points[state.selected].segmentId, continuation.id);
+  });
+}
+
+test('N at a shared start inserts into the selected ordinary Pedro segment', () => {
+  seed();
+  const path = state.paths[0] = createPath('Split', [0,10,20,30,40].map(x => createAnchor(x,x)));
+  ensurePathSegments(path);
+  splitPathSegment(path,2);
+  setActiveSegment(1,2);
+  const before = [...path.points];
+  key('n');
+  assert.equal(state.selected,3);
+  assert.equal(path.points[3].segmentId, path.segments[1].id);
+  assert.deepEqual(path.points.slice(4),before.slice(3));
+});
+
+test('C adds and selects up to two Pedro controls and keeps copy and typing intact', () => {
+  seed();
+  const path = state.paths[0];
+  state.selected = 1;
+  const history = state._history.length;
+  key('c', true);
+  document.activeElement = { tagName: 'INPUT' };
+  key('c');
+  document.activeElement = { tagName: 'BODY' };
+  assert.equal(state._history.length, history);
+  key('c');
+  assert.deepEqual(state.selectedControl, { pointIndex: 1, controlIndex: 0 });
+  key('C');
+  key('c');
+  assert.equal(path.points[1].controlPoints.length, 2);
+  assert.deepEqual(state.selectedControl, { pointIndex: 1, controlIndex: 1 });
+  assert.equal(state._history.length, history + 2);
+  state.selected = 0;
+  state.selectedControl = null;
+  key('c');
+  document.getElementById('javaType').value = 'rr';
+  state.selected = 2;
+  key('c');
+  assert.equal(state._history.length, history + 2);
+});
+
+for (const terminal of [false,true]) {
+  test('selecting a rejoin focuses Main and N inserts after its ' + (terminal ? 'final' : 'interior') + ' anchor', async () => {
+    const { migrateGraph, fork, appendAnchor, rejoin, bindGraph } = await import('../js/branch_graph.js');
+    seed();
+    const path = state.paths[0] = createPath('Original', [0,10,20,30].map(x => createAnchor(x,0)));
+    const g = migrateGraph(path);
+    const alternate = fork(g,'a2','Alternative');
+    appendAnchor(g,alternate,createAnchor(12,8));
+    const junction = terminal ? 'a4' : 'a3';
+    rejoin(g,alternate,junction);
+    bindGraph(path,g);
+    const arrivals = g.sections.filter(s => s.steps.at(-1).anchorId === junction);
+    const before = arrivals.map(s=>s.steps.map(p=>p.anchorId));
+    const incomingRow = path.points.findLastIndex(p=>p.segmentId===alternate.id);
+    setActiveSegment(g.sections.indexOf(alternate),incomingRow);
+    assert.notEqual(path.segments[path.activeSegment].id,alternate.id);
+    assert.equal(path.points[state.selected].anchorId,junction);
+    const count = g.anchors.length;
+    const history = state._history.length;
+    key('n');
+    const main = g.sections[path.activeSegment];
+    assert.equal(main.steps[0].anchorId,junction);
+    assert.equal(main.steps[1].anchorId,path.points[state.selected].anchorId);
+    if (!terminal) assert.equal(main.steps[2].anchorId,'a4');
+    assert.deepEqual(arrivals.map(s=>s.steps.map(p=>p.anchorId)),before);
+    assert.equal(g.anchors.length,count+1);
+    assert.equal(state._history.length,history+1);
+    key('z',true);
+    assert.equal(state.paths[0].graph.anchors.length,count);
+  });
+}
+
+test('click cycles three overlapping waypoints and drag moves only the current selection', () => {
+  seed();
+  const path = state.paths[0] = createPath('Overlap', [100,100,100].map(x=>createAnchor(x,150)));
+  setActiveSegment(-1);
+  const click = () => {
+    clickFieldPoint(path.points[0]);
+    listeners.get('mouseup')({ button:0 });
+    return state.selected;
+  };
+  const history = state._history.length;
+  const order = [click(),click(),click()];
+  assert.equal(new Set(order).size,3);
+  assert.equal(click(),order[0]);
+  assert.equal(state._history.length,history);
+  const selected = state.selected;
+  const position = imagePxToCanvas(100,150);
+  clickFieldPoint(path.points[selected]);
+  listeners.get('mousemove')({clientX:position.x+30,clientY:position.y});
+  listeners.get('mouseup')({button:0});
+  assert.equal(state.selected,selected);
+  assert.notEqual(path.points[selected].xPx,100);
+  assert.ok(path.points.every((p,i)=>i===selected || p.xPx===100));
+  assert.equal(state._history.length,history+1);
+  if (state._hoverTimer) clearTimeout(state._hoverTimer);
+});
+
+test('click cycles between an anchor and its overlapping Bézier controls', () => {
+  seed();
+  const path = state.paths[0] = createPath('Curve', [createAnchor(10,10),
+    createAnchor(100,150,0,false,[{xPx:100,yPx:150},{xPx:100,yPx:150}])]);
+  setActiveSegment(-1,1);
+  const history = state._history.length;
+  for (const expected of [0,1,null]) {
+    clickFieldPoint(path.points[1]);
+    listeners.get('mouseup')({button:0});
+    assert.equal(state.selected,1);
+    assert.equal(state.selectedControl?.controlIndex ?? null,expected);
+  }
+  assert.equal(state._history.length,history);
+});

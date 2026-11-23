@@ -20,10 +20,10 @@ import {
   setRobotDimensionsFromDisplay,
   syncConfigUI
 } from './field_config.js';
-import { addControlPoint, removeAnchor, removeControlPoint, MAX_PATH_POINTS, getHeadingMode, setHeadingMode } from './path_model.js';
-import { addPathSegment, canRemovePathSegment, canSplitPathSegment, ensurePathSegments, getSegmentPoints, removePathSegment, segmentMethodNames, splitPathSegment } from './segment_model.js';
+import { createAnchor, addControlPoint, removeAnchor, removeControlPoint, MAX_PATH_POINTS, getHeadingMode, setHeadingMode } from './path_model.js';
+import { addPathSegment, canRemovePathSegment, canSplitPathSegment, ensurePathSegments, getSegmentPoints, removePathSegment, splitPathSegment } from './segment_model.js';
 import { transformFieldPose } from './coordinates.js';
-import { bindGraph, promote, graphWarnings, migrateGraph, fork, duplicateSection, rejoin, validTargets, prune, deletionSet, insertMidpoint, selectRoute, focusedRoute, outgoing, startId } from './branch_graph.js';
+import { bindGraph, focusRejoin, canStartSegment, startSegment, graphWarnings, migrateGraph, prepareFork, appendAnchor, duplicateSection, rejoin, validTargets, canExtend, prune, deletionSet, insertMidpoint, selectRoute, focusedRoute, outgoing, startId } from './branch_graph.js';
 import { previewCount } from './state.js';
 import { planSegmentReorder, planPointMove, planPointAsSegment, focusPointSegment } from './segment_model.js';
 import { collisionReport } from './collision_state.js';
@@ -55,6 +55,7 @@ export function initUI() {
     if (redo()) refreshAfterHistory();
   });
   els.deleteBtn.addEventListener('click', deleteSelectedEntity);
+  document.getElementById('addHandle').addEventListener('click', () => addConnectionControl());
 
   els.clearBtn.addEventListener('click', () => {
     const path = state.paths[state.activePath];
@@ -94,9 +95,7 @@ export function initUI() {
     refreshAll();
   });
 
-  [els.path1Btn, els.path2Btn, els.path3Btn, els.path4Btn].forEach((button, index) => {
-    button?.addEventListener('click', () => setActivePath(index));
-  });
+  els.autoSelect.addEventListener('change', () => setActivePath(els.autoSelect.selectedIndex));
 
   const updateRobot = () => {
     setRobotDimensionsFromDisplay(els.robotLen.value, els.robotWid.value);
@@ -140,13 +139,11 @@ export function setActivePath(index, { preserveSelection = false } = {}) {
   els.className.value = state.paths[state.activePath].className || 'AutoPath';
   if (state.paths[state.activePath].graph && !isPedroPathingSelected()) { els.javaType.value = 'pedro'; els.javaType.dispatchEvent(new Event('change')); }
   if (!preserveSelection) clearSelection();
-  [els.path1Btn, els.path2Btn, els.path3Btn, els.path4Btn].forEach((button, buttonIndex) => {
-    button?.classList.toggle(`active-path${buttonIndex}`, buttonIndex === state.activePath);
-  });
+  els.autoSelect.selectedIndex = state.activePath;
   refreshAll();
 }
 
-export function setActiveSegment(index) {
+export function setActiveSegment(index, pointIndex = -1) {
   const path = state.paths[state.activePath];
   const segments = ensurePathSegments(path);
   path.activeSegment = Number.isInteger(index) ? Math.max(-1, Math.min(index, segments.length - 1)) : -1;
@@ -155,10 +152,65 @@ export function setActiveSegment(index) {
     setPreviewIndex(path.previewIndex);
   }
   clearSelection();
+  state.selected = focusRejoin(path, pointIndex);
+  refreshAll();
+}
+
+function beginForkPlacement(path, draft) {
+  cancelForkPlacement();
+  const notice = document.getElementById('placementNotice');
+  const message = document.getElementById('placementMessage');
+  const controller = new AbortController();
+  state.branchPlacement = { ...draft, path, controller };
+  notice.hidden = false;
+  message.textContent = draft.main
+    ? '1 of 2 · Click the field to place the Main point.'
+    : 'Click the field to place the Branch point. The existing route continues from the fork.';
+  const canvas = document.getElementById('canvas');
+  canvas.focus({preventScroll:true});
+  notice.scrollIntoView({block:'nearest'});
+  // Leaving placement for another editor action discards the uncommitted draft.
+  const leave = event => {
+    if (event.target !== canvas && !notice.contains(event.target)) cancelForkPlacement();
+  };
+  for (const type of ['pointerdown','focusin','click','change','drop'])
+    document.addEventListener(type, leave, {capture:true, signal:controller.signal});
+}
+
+export function cancelForkPlacement() {
+  if (!state.branchPlacement) return;
+  state.branchPlacement.controller.abort();
+  state.branchPlacement = null;
+  document.getElementById('placementNotice').hidden = true;
+  draw();
+}
+
+export function placeForkPoint(x, y) {
+  const draft = state.branchPlacement;
+  if (!draft) return;
+  if (draft.path !== state.paths[state.activePath]) { cancelForkPlacement(); return; }
+  const point = createAnchor(x, y, draft.anchor.headingRad);
+  if (draft.main && !draft.mainPoint) {
+    appendAnchor(draft.graph, draft.main, point);
+    draft.mainPoint = point;
+    document.getElementById('placementMessage').textContent = '2 of 2 · Click the field to place the Branch point.';
+    draw();
+    return;
+  }
+  appendAnchor(draft.graph, draft.branch, point);
+  selectRoute(draft.graph, draft.branch);
+  const changes = { activeSegment: draft.graph.sections.indexOf(draft.branch) };
+  bindGraph(changes, draft.graph);
+  pushHistory();
+  Object.assign(draft.path, changes);
+  state.selected = draft.path.points.findLastIndex(p => p.segmentId === draft.branch.id);
+  state.selectedControl = null;
+  cancelForkPlacement();
   refreshAll();
 }
 
 function installSegmentControls() {
+  document.getElementById('cancelPlacement').addEventListener('click', cancelForkPlacement);
   document.getElementById('branchActions')?.addEventListener('click', event => {
     const action = event.target.dataset.branch;
     if (!action) return;
@@ -172,7 +224,8 @@ function installSegmentControls() {
       const id = owner?.steps[local]?.anchorId;
       if (action === 'fork') {
         if (!id) throw Error('Select an anchor first.');
-        s = fork(graph,id,'Branch ' + (graph.sections.length+1));
+        beginForkPlacement(path, prepareFork(graph,owner,id));
+        return;
       } else if (action === 'insert') {
         if (!id) throw Error('Select the destination of a connection.');
         insertMidpoint(graph,owner,local);
@@ -194,7 +247,9 @@ function installSegmentControls() {
       pushHistory();
       if (!s) { delete path.graph; path.points = []; path.segments = []; path.activeSegment = -1; }
       else { path.activeSegment = graph.sections.indexOf(s); selectRoute(graph,s); bindGraph(path,graph); }
-      clearSelection(); refreshAll();
+      clearSelection();
+      if (action === 'join') state.selected = focusRejoin(path,path.points.findLastIndex(p => p.segmentId === s.id));
+      refreshAll();
     } catch (error) { els.segmentStatus.textContent = error.message; }
   });
   document.getElementById('sectionColor')?.addEventListener('change', event => {
@@ -232,6 +287,9 @@ function installSegmentControls() {
     if (state.selectedControl) return;
     applySegmentEdit(path => planPointMove(path, state.selected, els.pointSegmentTarget.value));
   });
+  document.getElementById('insertAfter')?.addEventListener('change', event => {
+    setActiveSegment(state.paths[state.activePath].activeSegment, Number(event.target.value));
+  });
   els.segmentSelect.addEventListener('change', () => setActiveSegment(Number(els.segmentSelect.value)));
   els.segmentName.addEventListener('change', () => {
     const path = state.paths[state.activePath];
@@ -252,16 +310,17 @@ function installSegmentControls() {
     const path = state.paths[state.activePath];
     if (path.graph) {
       const point = path.points[state.selected];
-      if (!point || state.selectedControl) return;
+      const owner = path.segments.find(s => s.id === point?.segmentId);
+      if (state.selectedControl || !canStartSegment(path.graph,owner,point?.anchorId)) return;
       pushHistory();
-      const next = promote(path.graph,point.anchorId);
-      if (next) { path.activeSegment = path.segments.indexOf(next); bindGraph(path); clearSelection(); refreshAll(); }
+      const next = startSegment(path.graph,owner,point.anchorId);
+      bindGraph(path);
+      setActiveSegment(path.segments.indexOf(next), path.points.findIndex(p => p.segmentId === next.id));
       return;
     }
     if (state.selectedControl || !canSplitPathSegment(path, state.selected)) return;
     pushHistory();
     splitPathSegment(path, state.selected);
-    clearSelection();
     refreshAll();
   });
   els.deleteSegment.addEventListener('click', () => {
@@ -303,12 +362,9 @@ function applySegmentEdit(planEdit) {
 export function refreshSegmentControls() {
   if (!els.segmentSelect?.replaceChildren) return;
   const pedro = isPedroPathingSelected();
-  els.legacyPathControls.hidden = false;
+  els.autoSelect.selectedIndex = state.activePath;
   els.segmentControls.hidden = !pedro;
-  [els.path1Btn, els.path2Btn, els.path3Btn, els.path4Btn].forEach((button, index) => {
-    button.disabled = index >= state.paths.length;
-    button.classList.toggle(`active-path${index}`, index === state.activePath);
-  });
+
   if (!pedro) return;
   const path = state.paths[state.activePath];
   const segments = ensurePathSegments(path);
@@ -334,7 +390,19 @@ export function refreshSegmentControls() {
     const active = segments[path.activeSegment];
     const color = document.getElementById('sectionColor');
     color.disabled = !active;
-    color.value = /^#[0-9a-f]{6}$/i.test(active?.color) ? active.color : '#38bdf8';
+    const sectionColor = active?.color || path.color;
+    color.value = /^#[0-9a-f]{6}$/i.test(sectionColor) ? sectionColor : '#38bdf8';
+    color.parentElement.hidden = !active;
+    const placement = document.getElementById('insertAfter');
+    placement.parentElement.hidden = !active || active.finished;
+    if (!placement.parentElement.hidden) {
+      const sharedEnd = graph && active.steps.length > 1 && !canExtend(graph, active);
+      const anchors = getSegmentPoints(path, active.id).map(point => ({index: path.points.indexOf(point)}));
+      if (sharedEnd) anchors.pop();
+      placement.replaceChildren(new Option(sharedEnd ? 'Before shared junction' : 'Section end','-1'),
+        ...anchors.map(({index}) => new Option('Anchor ' + (index + 1),String(index))));
+      placement.value = anchors.some(({index}) => index === state.selected) && !state.selectedControl ? String(state.selected) : '-1';
+    }
     const finish = document.querySelector('[data-branch="finish"]');
     finish.textContent = active?.finished ? 'Extend ending' : 'Finish independently';
     finish.disabled = !active || getSegmentPoints(path,active.id).length < 2 || !!graph && (outgoing(graph,active.steps.at(-1)?.anchorId).length > 0 || graph.sections.some(other => other !== active && other.steps.at(-1)?.anchorId === active.steps.at(-1)?.anchorId));
@@ -344,10 +412,25 @@ export function refreshSegmentControls() {
     target.replaceChildren(...(graph ? validTargets(graph,segments[path.activeSegment]) : []).map(a => {
       const p = path.points.find(p => p.anchorId === a.id);
       const part = segments.find(s => s.id === p.segmentId);
-      return new Option(part.name + ' · ' + a.id,a.id);
+      return new Option(part.name + ' · Anchor ' + (path.points.indexOf(p) + 1), a.id);
     }));
     if ([...target.options].some(o => o.value === previous)) target.value = previous;
-    document.querySelector('[data-branch="join"]').disabled = !target.options.length;
+    const unavailable = !target.options.length;
+    target.disabled = unavailable;
+    document.querySelector('[data-branch="join"]').disabled = unavailable;
+    const hint = document.getElementById('joinHint');
+    hint.hidden = !unavailable;
+    if (unavailable) {
+      target.add(new Option('No available target', ''));
+      if (!graph) hint.textContent = 'Select an anchor and choose Branch from anchor first.';
+      else if (!active?.steps.length) hint.textContent = 'Select a branch with a starting anchor.';
+      else if (active.finished) hint.textContent = 'Choose Extend ending to reopen this branch.';
+      else if (active.steps.length > 1 && outgoing(graph,active.steps.at(-1).anchorId).length)
+        hint.textContent = 'This section continues into another section. Select the ending you want to rejoin from.';
+      else if (active.steps.length > 1 && graph.sections.some(s => s !== active && s.steps.at(-1)?.anchorId === active.steps.at(-1).anchorId))
+        hint.textContent = 'This ending is already shared.';
+      else hint.textContent = 'No other anchor can be reached without looping back. Add a downstream anchor on the other route first.';
+    }
   }
   const allOption = document.createElement('option');
   allOption.value = '-1';
@@ -385,10 +468,7 @@ export function refreshSegmentControls() {
     ? previousTarget : targets[0]?.id || '';
   els.pointSegmentTarget.disabled = !selectedPoint || targets.length === 0;
   els.movePointSegment.disabled = els.pointSegmentTarget.disabled;
-  const owner = segments.find(candidate => candidate.id === selectedPoint?.segmentId);
-  els.pointMoveStatus.textContent = selectedPoint
-    ? `Selected point ${state.selected + 1} in ${owner.name}. Moves to the end of the destination segment.`
-    : 'Select an anchor on the field or in the table to move it.';
+  els.pointMoveStatus.textContent = '';
   const segment = segments[path.activeSegment];
   const modes = new Set(segment ? getSegmentPoints(path, segment.id).slice(1).map(getHeadingMode) : []);
   els.segmentHeadingMode.disabled = modes.size === 0;
@@ -398,28 +478,27 @@ export function refreshSegmentControls() {
   els.segmentName.disabled = !segment;
   els.segmentName.value = segment?.name || '';
   els.segmentName.placeholder = segment ? 'Collect samples' : 'Select a segment to rename';
-  const method = segmentMethodNames(segments)[path.activeSegment];
-  const detail = segment?.finished ? 'Independent ending.' : !segment ? 'Showing all segments. New points append to the last segment.'
-    : getSegmentPoints(path, segment.id).length >= 2 ? `Exports as ${method}()` : 'Add at least two anchors to export a path method.';
-  els.segmentStatus.textContent = `${path.name}: ${graph?.anchors.length ?? path.points.length}/${MAX_PATH_POINTS} anchor points across all segments. ${detail}${(graph?.anchors.length ?? path.points.length) >= MAX_PATH_POINTS ? ' Point limit reached.' : ''}`;
-  if (graph) els.segmentStatus.textContent += ' ' + graphWarnings(graph).join(' ');
+  const count = graph?.anchors.length ?? path.points.length;
+  document.getElementById('anchorCount').textContent = count + ' / ' + MAX_PATH_POINTS + ' anchors';
+  const messages = graph ? graphWarnings(graph) : [];
+  if (count >= MAX_PATH_POINTS) messages.push('Point limit reached.');
+  if (segment?.finished) messages.unshift('Independent ending.');
+  els.segmentStatus.textContent = messages.join('\n');
   els.splitSegment.disabled = !!state.selectedControl || !canSplitPathSegment(path, state.selected);
   els.deleteSegment.disabled = !canRemovePathSegment(path, path.activeSegment);
   if (graph) {
     const owner = segments.find(s => s.id === selectedPoint?.segmentId);
-    els.splitSegment.disabled = !owner?.steps.slice(1,-1).some(item => item.anchorId === selectedPoint.anchorId);
+    els.splitSegment.disabled = !canStartSegment(graph,owner,selectedPoint?.anchorId);
     for (const el of [els.pointAsSegment,els.movePointSegment,els.deleteSegment,els.addSegment]) el.disabled = true;
   }
   els.deleteSegment.title = !segment ? 'Select a segment to remove its label.' : segments.length <= 1 ? 'Keep at least one segment in this path.' : els.deleteSegment.disabled ? 'Disconnected routes need separate segment labels.' : 'Keep the points and merge this label into its neighbor.';
 }
 
 function installPreviewControls() {
-  const left = document.querySelector('.left');
-  const waypointHeading = findWaypointHeading(left);
   const panel = document.createElement('div');
   panel.className = 'panel-group';
   panel.innerHTML = `
-    <h2>Preview / Step-through</h2>
+
     <label class="row">
       <span class="custom-checkbox-wrapper">
         <input type="checkbox" id="previewToggle" class="hidden-checkbox">
@@ -435,7 +514,7 @@ function installPreviewControls() {
       <button id="previewAll">All</button>
       <button id="previewNone">None</button>
     </div>
-    <div class="row"><input type="range" id="previewSlider" min="-1" max="-1" value="-1" step="1"></div>
+    <div class="row"><input type="range" aria-label="Preview step" id="previewSlider" min="-1" max="-1" value="-1" step="1"></div>
     <label class="row">
       <span class="custom-checkbox-wrapper">
         <input type="checkbox" id="dimFutureToggle" class="hidden-checkbox" checked>
@@ -445,7 +524,7 @@ function installPreviewControls() {
       </span>
     </label>
     <small id="previewStatus" class="small"></small>`;
-  left.insertBefore(panel, waypointHeading);
+  document.getElementById('previewPanel').append(panel);
 
   const toggle = panel.querySelector('#previewToggle');
   const slider = panel.querySelector('#previewSlider');
@@ -494,12 +573,10 @@ function installPreviewControls() {
 }
 
 function installTransformControls() {
-  const left = document.querySelector('.left');
-  const waypointHeading = findWaypointHeading(left);
   const panel = document.createElement('div');
   panel.className = 'panel-group';
   panel.innerHTML = `
-    <h2>Transform (Mirror / Rotate)</h2>
+    <h3>Path tools</h3>
     <div class="row">
       <button data-transform="mirrorX">Mirror X</button>
       <button data-transform="mirrorY">Mirror Y</button>
@@ -508,9 +585,8 @@ function installTransformControls() {
       <button data-transform="rotCCW">↶ 90°</button>
       <button data-transform="rotCW">↷ 90°</button>
       <button data-transform="rot180">180°</button>
-    </div>
-    <small class="small">Transforms apply to anchors and control points.</small>`;
-  left.insertBefore(panel, waypointHeading);
+    </div>`;
+  document.getElementById('transforms').append(panel);
   panel.querySelectorAll('[data-transform]').forEach(button => {
     button.addEventListener('click', () => applyTransform(button.dataset.transform));
   });
@@ -579,6 +655,20 @@ export function updateTable() {
   bindTableActions(path);
 }
 
+export function addConnectionControl(pointIndex = state.selected) {
+  const path = state.paths[state.activePath];
+  const point = path.points[pointIndex];
+  if (!isPedroPathingSelected() || !point || pointIndex < 1 || point.breakBefore ||
+      (point.controlPoints?.length || 0) >= 2) return false;
+  pushHistory();
+  const controlIndex = addControlPoint(path, pointIndex);
+  state.selected = pointIndex;
+  state.selectedControl = { pointIndex, controlIndex };
+  focusPointSegment(path, pointIndex, true);
+  refreshAll();
+  return true;
+}
+
 function bindTableActions(path) {
   els.pointRows.querySelectorAll('.anchor-lock').forEach(input => {
     input.addEventListener('change', () => {
@@ -598,7 +688,10 @@ function bindTableActions(path) {
     button.addEventListener('click', () => {
       state.selected = Number(button.dataset.point);
       state.selectedControl = null;
-      if (isPedroPathingSelected()) focusPointSegment(path, state.selected);
+      if (isPedroPathingSelected()) {
+        state.selected = focusRejoin(path,state.selected);
+        focusPointSegment(path,state.selected);
+      }
       refreshAll();
     });
   });
@@ -614,17 +707,7 @@ function bindTableActions(path) {
     });
   });
   els.pointRows.querySelectorAll('.add-control').forEach(button => {
-    button.addEventListener('click', () => {
-      if (!isPedroPathingSelected()) return;
-      const pointIndex = Number(button.dataset.point);
-      pushHistory();
-      const controlIndex = addControlPoint(path, pointIndex);
-      if (controlIndex >= 0) {
-        state.selected = pointIndex;
-        state.selectedControl = { pointIndex, controlIndex };
-      }
-      refreshAll();
-    });
+    button.addEventListener('click', () => addConnectionControl(Number(button.dataset.point)));
   });
   els.pointRows.querySelectorAll('.delete-control').forEach(button => {
     button.addEventListener('click', () => {
@@ -812,9 +895,6 @@ function checkboxMarkup(id, className, checked, data) {
   </span>`;
 }
 
-function findWaypointHeading(left) {
-  return [...left.querySelectorAll(':scope > h2')].find(heading => heading.textContent.includes('2) Waypoints'));
-}
 
 function formatDeg(rad) {
   if (state.headingWrapHalf) return normalize(rad) * 180 / Math.PI;

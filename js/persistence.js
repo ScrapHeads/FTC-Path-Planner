@@ -4,7 +4,7 @@ import { normalizeZones } from './exclusion_model.js';
 
 export const STORAGE_KEY = 'ftc-path-planner.workspace.v1';
 const STATE_KEYS = [
-  'paths', 'activePath', 'fieldConfig', 'robotDimensions', 'selected',
+  'workspaceView', 'paths', 'activePath', 'fieldConfig', 'robotDimensions', 'selected',
   'selectedControl', 'headingWrapHalf', 'hudVisible', 'dimFuture',
   'exclusionBox', 'exclusionZones', 'exclusionSettings', 'exclusionPanelOpen', 'chosenDirPath', 'imageSource'
 ];

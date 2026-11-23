@@ -32,11 +32,7 @@ export const els = {
   headingWrap: document.getElementById('headingWrap'),
 
   // Setting the paths
-  path1Btn: document.getElementById('path1'),
-  path2Btn: document.getElementById('path2'),
-  path3Btn: document.getElementById('path3'),
-  path4Btn: document.getElementById('path4'),
-  legacyPathControls: document.getElementById('legacyPathControls'),
+  autoSelect: document.getElementById('autoSelect'),
   segmentControls: document.getElementById('segmentControls'),
   segmentSelect: document.getElementById('segmentSelect'),
   segmentUp: document.getElementById('segmentUp'),
@@ -59,7 +55,6 @@ export const els = {
   exportFileType: document.getElementById('exportFileType'),
   exportFolderPath: document.getElementById('exportFolderPath'),
   className: document.getElementById('className'),
-  exportBtn: document.getElementById('exportBtn'),
   saveFileBtn: document.getElementById('saveFileBtn'),
   chooseDirBtn: document.getElementById('chooseDirBtn'),
   copyBtn: document.getElementById('copyBtn'),

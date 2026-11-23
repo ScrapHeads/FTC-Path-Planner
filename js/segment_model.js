@@ -2,6 +2,23 @@ const JAVA_RESERVED = new Set(('abstract assert boolean break byte case catch ch
 
 import { MAX_PATH_POINTS } from './path_model.js';
 
+export const SECTION_COLORS = ['#38bdf8', '#fb923c', '#a78bfa', '#4ade80', '#f472b6'];
+
+export function splitColor(source = '#7dd3fc', sections) {
+  const used = new Set(sections.map(s => s.color?.toLowerCase()));
+  const available = SECTION_COLORS.filter(color => color !== source.toLowerCase() && !used.has(color));
+  const palette = available.length ? available : SECTION_COLORS;
+  // Prefer a visibly contrasting swatch, including for custom parent colors.
+  function distance(color) {
+    return [1, 3, 5].reduce((sum, i) => {
+      const channel = parseInt(color.slice(i,i+2),16);
+      const parent = parseInt(source.slice(i,i+2),16);
+      return sum + (channel - parent) ** 2;
+    }, 0);
+  }
+  return palette.reduce((best, color) => distance(color) > distance(best) ? color : best);
+}
+
 export function createPath(name, points = [], color = '#7dd3fc') {
   return { name, color, points, previewEnabled: false, previewIndex: points.length - 1 };
 }
@@ -34,7 +51,12 @@ export function getSegmentPoints(path, segmentId) {
   ensurePathSegments(path);
   if (path.graph) return path.points.filter(p => p.segmentId === segmentId);
   const first = path.points.findIndex(point => point.segmentId === segmentId);
-  if (first < 0) return [];
+  if (first < 0) {
+    const index = path.segments.findIndex(s => s.id === segmentId);
+    const previous = path.segments[index - 1];
+    const boundary = previous && path.segments[index].sharesPreviousEnd && path.points.findLast(p => p.segmentId === previous.id);
+    return boundary ? [boundary] : [];
+  }
   const points = path.points.filter(point => point.segmentId === segmentId);
   // A boundary anchor is shared by the preceding and following segment.
   if (first > 0 && !path.points[first].breakBefore) points.unshift(path.points[first - 1]);
@@ -76,9 +98,18 @@ export function pointInsertionIndex(path) {
 
 export function canSplitPathSegment(path, pointIndex) {
   ensurePathSegments(path);
+  if (canStartAtEnd(path, pointIndex)) return true;
   return pointIndex >= 1 && pointIndex < path.points.length - 1 &&
     path.points[pointIndex].segmentId === path.points[pointIndex + 1].segmentId &&
     !path.points[pointIndex + 1].breakBefore;
+}
+
+function canStartAtEnd(path, pointIndex) {
+  const point = path.points[pointIndex];
+  if (!point || (path.points[pointIndex + 1] && !path.points[pointIndex + 1].breakBefore)) return false;
+  if (path.points.findLastIndex(p => p.segmentId === point.segmentId) !== pointIndex) return false;
+  const source = path.segments.findIndex(s => s.id === point.segmentId);
+  return !path.segments[source + 1]?.sharesPreviousEnd;
 }
 
 export function splitPathSegment(path, pointIndex) {
@@ -86,6 +117,8 @@ export function splitPathSegment(path, pointIndex) {
   const sourceId = path.points[pointIndex].segmentId;
   const sourceIndex = path.segments.findIndex(segment => segment.id === sourceId);
   const segment = addPathSegment(path, `${path.segments[sourceIndex].name} 2`);
+  if (!path.points[pointIndex + 1] || path.points[pointIndex + 1].breakBefore) segment.sharesPreviousEnd = true;
+  segment.color = splitColor(path.segments[sourceIndex].color || path.color, path.segments);
   path.segments.pop();
   path.segments.splice(sourceIndex + 1, 0, segment);
   for (let index = pointIndex + 1; index < path.points.length && path.points[index].segmentId === sourceId; index++) {

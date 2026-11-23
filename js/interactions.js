@@ -20,10 +20,10 @@ import {
 import { normalize } from './utils.js';
 import { canonicalToHeading, syncConfigUI } from './field_config.js';
 import { fromMeters, toMeters } from './units.js';
-import { appendAnchor, bindGraph, canExtend, focusedRoute } from './branch_graph.js';
+import { appendAnchor, bindGraph, canExtend, focusRejoin, extendRejoinedEnd, incoming, outgoing, focusedRoute } from './branch_graph.js';
 import { createAnchor, removeAnchor, removeControlPoint, MAX_PATH_POINTS } from './path_model.js';
-import { addPathSegment, ensurePathSegments, focusPointSegment, pointInsertionIndex } from './segment_model.js';
-import { updateTable, syncSelectedUI, refreshDraggedRow } from './ui.js';
+import { addPathSegment, ensurePathSegments, focusPointSegment, getSegmentPoints, pointInsertionIndex } from './segment_model.js';
+import { addConnectionControl, cancelForkPlacement, placeForkPoint, updateTable, syncSelectedUI, refreshDraggedRow } from './ui.js';
 import { startExclusionBox, moveExclusionBox, finishExclusionBox, isExclusionDrawingEnabled } from './exclusion_zone.js';
 
 let pendingDragFrame = null;
@@ -40,47 +40,68 @@ function scheduleDragFrame() {
   else renderDragFrame();
 }
 
+function selectFieldHit(path, hit) {
+  let index = hit.pointIndex ?? hit.index;
+  const control = hit.type === 'control';
+  if (isPedroPathingSelected()) {
+    if (!control) index = focusRejoin(path, index);
+    focusPointSegment(path, index, control);
+  }
+  state.selected = index;
+  state.selectedControl = control ? { pointIndex: index, controlIndex: hit.controlIndex } : null;
+}
+
 export function initInteractions() {
+  let overlapPress = null;
+  window.addEventListener('blur', () => { overlapPress = null; });
   canvas.addEventListener('mousedown', event => {
     if (event.button !== 0) return;
+    overlapPress = null;
+    if (document.activeElement?.matches?.('input, textarea, select')) document.activeElement.blur();
     const mouse = mousePos(event);
     state.lastMouse = mouse;
-    const hit = hitTest(mouse.x, mouse.y);
-    const path = state.paths[state.activePath];
-    const selectedAnchor = state.selected;
-    const selectedControl = state.selectedControl;
-    state.dragMode = null;
-
-    if (!hit) return;
-    if (isPedroPathingSelected() && ['point', 'handle', 'control'].includes(hit.type)) {
-      focusPointSegment(path, hit.pointIndex ?? hit.index, hit.type === 'control');
-    }
-    if (hit.type === 'empty' && state.imgLoaded && isExclusionDrawingEnabled()) {
-      startExclusionBox(mouse);
-      state.dragMode = 'exclusion-box';
+    if (state.branchPlacement) {
       event.preventDefault();
-    } else if (hit.type === 'control') {
-      state.selected = hit.pointIndex;
-      state.selectedControl = { pointIndex: hit.pointIndex, controlIndex: hit.controlIndex };
-      const control = path.points[hit.pointIndex].controlPoints[hit.controlIndex];
-      const wasSelected = selectedControl?.pointIndex === hit.pointIndex && selectedControl.controlIndex === hit.controlIndex;
-      if (wasSelected && !control.locked) {
-        pushHistory();
-        state.dragMode = 'move-control';
+      if (pointWithinImage(mouse, layout().imgRect)) {
+        const point = canvasToImagePx(mouse.x, mouse.y);
+        placeForkPoint(point.x, point.y);
       }
-    } else if (hit.type === 'handle') {
-      state.selected = hit.index;
-      state.selectedControl = null;
-      if (selectedAnchor === hit.index && !selectedControl && !path.points[hit.index].locked) {
-        pushHistory();
-        state.dragMode = 'rotate';
+      return;
+    }
+    const path = state.paths[state.activePath];
+    const hits = hitTest(mouse.x, mouse.y);
+    state.dragMode = null;
+    if (!hits.length) return;
+    const selected = hits.find(hit => {
+      if (hit.type === 'control') return state.selectedControl?.pointIndex === hit.pointIndex &&
+        state.selectedControl.controlIndex === hit.controlIndex;
+      if (hit.type === 'empty' || state.selectedControl) return false;
+      return hit.index === state.selected || (path.graph &&
+        path.points[hit.index].anchorId === path.points[state.selected]?.anchorId);
+    });
+    const hit = selected || hits[0];
+    if (hit.type === 'empty') {
+      if (isExclusionDrawingEnabled()) {
+        startExclusionBox(mouse);
+        state.dragMode = 'exclusion-box';
+        event.preventDefault();
       }
-    } else if (hit.type === 'point') {
-      state.selected = hit.index;
-      state.selectedControl = null;
-      if (selectedAnchor === hit.index && !selectedControl && !path.points[hit.index].locked) {
-        pushHistory();
-        state.dragMode = 'move-point';
+    } else {
+      selectFieldHit(path, hit);
+      if (selected) {
+        const point = path.points[state.selected];
+        const entity = hit.type === 'control' ? point.controlPoints[hit.controlIndex] : point;
+        const mode = { point: 'move-point', handle: 'rotate', control: 'move-control' }[hit.type];
+        if (hits.length > 1) {
+          // Use stable waypoint order even when selecting a different active section
+          // changes the draw order. Keep the current entity until click vs drag is known.
+          hits.sort((a,b) => (a.pointIndex ?? a.index) - (b.pointIndex ?? b.index) ||
+            (a.controlIndex ?? -1) - (b.controlIndex ?? -1));
+          overlapPress = { path, mouse, next: hits[(hits.indexOf(hit)+1) % hits.length], mode, entity };
+        } else if (!entity.locked) {
+          pushHistory();
+          state.dragMode = mode;
+        }
       }
     }
 
@@ -92,6 +113,15 @@ export function initInteractions() {
   window.addEventListener('mousemove', event => {
     const mouse = mousePos(event);
     state.lastMouse = mouse;
+    if (overlapPress) {
+      const press = overlapPress;
+      if (Math.hypot(mouse.x-press.mouse.x, mouse.y-press.mouse.y) < 3*(window.devicePixelRatio || 1)) return;
+      overlapPress = null;
+      if (press.path === state.paths[state.activePath] && !press.entity.locked) {
+        pushHistory();
+        state.dragMode = press.mode;
+      }
+    }
     handleHoverIdle(mouse);
     if (!state.dragMode) return;
     if (state.dragMode === 'exclusion-box') {
@@ -136,6 +166,15 @@ export function initInteractions() {
   });
 
   window.addEventListener('mouseup', event => {
+    if (overlapPress && event.button !== undefined && event.button !== 0) return;
+    if (overlapPress) {
+      const {path,next} = overlapPress;
+      overlapPress = null;
+      if (path === state.paths[state.activePath]) {
+        selectFieldHit(path,next);
+        syncSelectedUI(); updateTable(); draw();
+      }
+    }
     const wasDragging = !!state.dragMode;
     if (pendingDragFrame !== null) {
       cancelAnimationFrame(pendingDragFrame);
@@ -150,6 +189,32 @@ export function initInteractions() {
   });
 
   window.addEventListener('keydown', event => {
+    overlapPress = null;
+    if (state.branchPlacement) {
+      if (event.key === 'Escape') cancelForkPlacement();
+      return;
+    }
+    if (document.querySelector?.('dialog[open], [popover]:popover-open')) return;
+    if (event.key.toLowerCase() === 'c') {
+      const target = document.activeElement;
+      if (!event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey &&
+          !['INPUT','TEXTAREA','SELECT'].includes(target?.tagName) && !target?.isContentEditable &&
+          !event.target?.closest?.('#previewPanel') && addConnectionControl()) event.preventDefault();
+      return;
+    }
+    // Section selection leaves keyboard focus in the sidebar. Let N place at the
+    // field cursor without requiring a click that could select a different section.
+    const sectionPicker = event.target?.closest?.('#segmentSelect, #insertAfter, #routeChoices select');
+    const navigator = event.target?.closest?.('#routesPanel');
+    if (event.key.toLowerCase() === 'n' && !event.ctrlKey && !event.metaKey && !event.altKey &&
+        (sectionPicker || navigator) && canvas.matches?.(':hover') &&
+        !document.querySelector?.('select:open') &&
+        (sectionPicker || !event.target.closest('input, textarea, select'))) {
+      event.preventDefault();
+      addPointAtCursor();
+      return;
+    }
+    if (event.target?.closest?.('#dock, #previewPanel, #routesPanel, #inspectorDivider')) return;
     const tag = document.activeElement?.tagName || '';
     const typing = ['INPUT', 'TEXTAREA', 'SELECT'].includes(tag);
     const path = state.paths[state.activePath];
@@ -230,8 +295,30 @@ function addPointAtCursor() {
     : { x: imgRect.x + imgRect.w / 2, y: imgRect.y + imgRect.h / 2 };
   const imagePoint = canvasToImagePx(canvasPoint.x, canvasPoint.y);
   let segments = ensurePathSegments(path);
-  if (path.graph && !canExtend(path.graph,segments[path.activeSegment])) return;
-  const insertionIndex = isPedroPathingSelected() ? pointInsertionIndex(path) : path.points.length;
+  const pedro = isPedroPathingSelected();
+  if (path.graph && !state.selectedControl) state.selected = focusRejoin(path,state.selected);
+  const activeSegment = pedro ? segments[path.activeSegment] : null;
+  const section = path.graph && activeSegment;
+  if (path.graph && !section) return;
+  const anchor = state.selectedControl ? null : path.points[state.selected];
+  const atRejoin = section && anchor && incoming(path.graph,anchor.anchorId).length > 1;
+  const extendSharedEnd = atRejoin && !outgoing(path.graph,anchor.anchorId).length;
+  if (section?.finished && !atRejoin) {
+    els.segmentStatus.textContent = 'Choose Extend ending to add more anchors.';
+    return;
+  }
+  // A shared junction stays last in this section and first in its continuations.
+  const sectionEnd = pedro ? pointInsertionIndex(path) : path.points.length;
+  const sharedEnd = section && !canExtend(path.graph, section);
+  const hasInsertionAnchor = anchor && (!activeSegment || getSegmentPoints(path, activeSegment.id).includes(anchor));
+  let insertionIndex = sectionEnd - (sharedEnd ? 1 : 0);
+  if (hasInsertionAnchor) {
+    if (sharedEnd && !extendSharedEnd && state.selected + 1 === sectionEnd) {
+      els.segmentStatus.textContent = 'To insert after this junction, select the outgoing section and its first anchor.';
+      return;
+    }
+    insertionIndex = state.selected + 1;
+  }
   const heading = insertionIndex > 0 ? path.points[insertionIndex - 1].headingRad : 0;
 
   pushHistory();
@@ -240,14 +327,15 @@ function addPointAtCursor() {
     addPathSegment(path);
     segments = path.segments;
   }
-  point.segmentId = isPedroPathingSelected()
-    ? (segments[path.activeSegment] || segments[segments.length - 1]).id
-    : path.points[path.points.length - 1]?.segmentId || segments[0].id;
-  if (path.graph) {
-    const s = path.segments[path.activeSegment];
-    appendAnchor(path.graph,s,point);
+  point.segmentId = activeSegment?.id || (hasInsertionAnchor ? anchor.segmentId : null) ||
+    (pedro ? segments.at(-1).id : path.points.at(-1)?.segmentId || segments[0].id);
+  if (extendSharedEnd) {
+    state.selected = extendRejoinedEnd(path,anchor.anchorId,point);
+  } else if (path.graph) {
+    const localIndex = section.steps.length - (sectionEnd - insertionIndex);
+    appendAnchor(path.graph, section, point, localIndex);
     bindGraph(path);
-    state.selected = path.points.findLastIndex(p => p.segmentId === s.id);
+    state.selected = insertionIndex;
   } else {
     path.points.splice(insertionIndex, 0, point);
     state.selected = insertionIndex;
@@ -305,19 +393,20 @@ function deleteSelection(path) {
 }
 
 function hitTest(canvasX, canvasY) {
-  if (!state.imgLoaded) return null;
+  const hits = [];
+  if (!state.imgLoaded) return hits;
   const path = state.paths[state.activePath];
   const dpi = window.devicePixelRatio || 1;
   const radius = 10 * dpi;
 
   if (isPedroPathingSelected()) {
     for (let pointIndex = path.points.length - 1; pointIndex >= 1; pointIndex--) {
-      if (path.graph && state.selected !== pointIndex) continue;
+      if (state.selected !== pointIndex) continue;
       const controls = path.points[pointIndex].controlPoints || [];
       for (let controlIndex = controls.length - 1; controlIndex >= 0; controlIndex--) {
         const canvasPoint = imagePxToCanvas(controls[controlIndex].xPx, controls[controlIndex].yPx);
         if (Math.hypot(canvasX - canvasPoint.x, canvasY - canvasPoint.y) <= radius) {
-          return { type: 'control', pointIndex, controlIndex };
+          hits.push({ type: 'control', pointIndex, controlIndex });
         }
       }
     }
@@ -330,21 +419,27 @@ function hitTest(canvasX, canvasY) {
     visible = new Set(focusedRoute(path.graph,active).map(s => s.id));
     indices.sort((a,b) => Number(path.points[b].segmentId === active.id) - Number(path.points[a].segmentId === active.id));
   }
+  const anchors = new Set();
   for (const index of indices) {
     const point = path.points[index];
-    if (visible && !visible.has(point.segmentId)) continue;
+    if (visible && !path.compareBranches && !visible.has(point.segmentId)) continue;
     const canvasPoint = imagePxToCanvas(point.xPx, point.yPx);
     const angle = headingToCanvasAngle(point.headingRad);
     const handle = {
       x: canvasPoint.x + Math.cos(angle) * 28 * dpi,
       y: canvasPoint.y + Math.sin(angle) * 28 * dpi
     };
-    if (Math.hypot(canvasX - handle.x, canvasY - handle.y) <= radius) return { type: 'handle', index };
-    if (Math.hypot(canvasX - canvasPoint.x, canvasY - canvasPoint.y) <= radius) return { type: 'point', index };
+    if (index === state.selected && !state.selectedControl && Math.hypot(canvasX - handle.x, canvasY - handle.y) <= radius) hits.push({ type: 'handle', index });
+    const id = point.anchorId ?? index;
+    if (!anchors.has(id) && Math.hypot(canvasX - canvasPoint.x, canvasY - canvasPoint.y) <= radius) {
+      hits.push({ type: 'point', index });
+      anchors.add(id);
+    }
   }
 
   const { imgRect } = layout();
-  return pointWithinImage({ x: canvasX, y: canvasY }, imgRect) ? { type: 'empty' } : null;
+  if (!hits.length && pointWithinImage({ x: canvasX, y: canvasY }, imgRect)) hits.push({ type: 'empty' });
+  return hits;
 }
 
 function getDraggedImagePoint(canvasPoint, snap) {

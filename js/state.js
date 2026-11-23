@@ -35,6 +35,7 @@ export const state = {
       previewIndex: -1,
     }
   ],
+  workspaceView: { slots: {} },
   activePath: 0, // Index of the currently selected path
 
   img: new Image(),
@@ -79,7 +80,7 @@ export const state = {
   measureEnd:   { x:0, y:0 },
 
   // Mini HUD
-  hudVisible: true,
+  hudVisible: false,
   dimFuture: true,
 
   // Hover label

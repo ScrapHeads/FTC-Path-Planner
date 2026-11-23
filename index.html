@@ -9,191 +9,27 @@
 </head>
 
 <body>
-  <div class="app">
-    <!-- LEFT: Config / Tools (scrolls independently) -->
-    <div class="left">
-      <h1>FTC Path Planner</h1>
-
-      <h2>1) Field</h2>
-      <div class="grid-2">
-        <div>
-          <label>Load image (PNG/JPG/SVG/WebP/BMP)</label>
-          <input id="imgInput" type="file" accept="image/*" />
-        </div>
-        <div>
-          <label>Sample image</label>
-          <select id="sampleSelect">
-            <option value="">— none —</option>
-            <option value="pedro-biobuzz">Pedro Pathing Biobuzz</option>
-            <option value="rr-into-the-deep">RoadRunner Into the Deep</option>
-            <option value="rr-decode">RoadRunner DECODE</option>
-            <option value="pedro-decode">Pedro Pathing DECODE</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="grid-2">
-        <div>
-          <label>Field size (chosen unit)</label>
-          <input id="fieldSize" type="number" value="3.66" />
-        </div>
-        <div>
-          <label>Origin (0, 0)</label>
-          <select id="originSelect">
-            <option value="center">Center</option>
-            <option value="bottomLeft">Bottom-left corner</option>
-            <option value="topLeft">Top-left corner</option>
-          </select>
-        </div>
-        <div>
-          <label>Unit used</label>
-          <select id="measurementsUnit">
-            <option value="m">Meters</option>
-            <option value="cm">Centimeters</option>
-            <option value="ft">Feet</option>
-            <option value="in">Inches</option>
-          </select>
-        </div>
-        <div>
-          <label>Coordinate system</label>
-          <select id="coordinateSystem">
-            <option value="ftc">FTC: X forward, Y left</option>
-            <option value="pedro">Pedro: X right, Y up</option>
-            <option value="image">Image: X right, Y down</option>
-          </select>
-        </div>
-      </div>
-
-      <h2>2) Waypoints</h2>
-      <div class="toolbar">
-        <button id="undoBtn">Undo</button>
-        <button id="redoBtn">Redo</button>
-        <button id="deleteBtn">Delete selected</button>
-        <button id="clearBtn" class="danger">Clear Selected</button>
-        <button id="clearAllBtn" class="danger">Clear All</button>
-        <button id="loadBtn">Load file…</button>
-      </div>
-
-      <!-- Direct pose editing -->
-      <div class="grid-2" style="margin-top:8px">
-        <div>
-          <label>Selected X</label>
-          <input id="selXIn" type="number" step="0.5" value="0" />
-        </div>
-        <div>
-          <label>Selected Y</label>
-          <input id="selYIn" type="number" step="0.5" value="0" />
-        </div>
-      </div>
-
-      <div class="grid-2" style="margin-top:8px">
-        <div>
-          <label>Selected heading (deg)</label>
-          <input id="headingDeg" type="number" step="1" value="0" />
-        </div>
-        <!-- <div>
-          <label>Quick rotate</label>
-          <div class="row">
-            <button data-rot="-15">-15°</button>
-            <button data-rot="-5">-5°</button>
-            <button data-rot="5">+5°</button>
-            <button data-rot="15">+15°</button>
-          </div>
-        </div> -->
-      </div>
-
-      <!-- Heading loop toggle -->
-      <div class="row" style="margin-top:8px">
-        <label class="row">
-          <div class="custom-checkbox-wrapper">
-            <input type="checkbox" id="headingWrap" class="hidden-checkbox">
-            <label for="headingWrap" class="custom-checkbox-label">
-              <span class="custom-checkbox-box"></span>
-              Wrap headings to <b>±180°</b> for display and <b>±π</b> on export
-            </label>
-          </div>
-        </label>
-      </div>
-      <div class="small">Off = show 0-360° and export radians in [0, 2π). On = show -180…+180° and export radians in
-        (−π, +π].</div>
-
-      <!-- Robot footprint (rectangle) -->
-      <h2>Robot footprint</h2>
-      <div class="grid-2">
-        <div>
-          <label>Length (Selected measurement)</label>
-          <input id="robotLen" type="number" step="0.5" value="0.4572" />
-        </div>
-        <div>
-          <label>Width (Selected measurement)</label>
-          <input id="robotWid" type="number" step="0.5" value="0.4572" />
-        </div>
-      </div>
-      <div class="row" style="margin-top:6px">
-
-        <label>
-          <input id="boxRotate" type="checkbox" class="hidden-checkbox" checked />
-          <label for="boxRotate" class="custom-checkbox-label">
-            <span class="custom-checkbox-box"></span>
-            Align with heading
-          </label>
-        </label>
-      </div>
-
-      <div class="toolbar" id="legacyPathControls">
-        <button id="path1">Path 1</button>
-        <button id="path2">Path 2</button>
-        <button id="path3">Path 3</button>
-        <button id="path4">Path 4</button>
-      </div>
-
-      <div id="segmentControls" hidden>
-        <div id="branchActions">
-          <div class="row"><button data-branch="fork">Branch from anchor</button><button data-branch="insert">Insert midpoint</button></div>
-          <div class="row"><button data-branch="duplicate">Duplicate branch</button><button data-branch="delete">Delete branch</button></div>
-          <button data-branch="finish">Finish independently</button>
-          <div class="row"><select id="joinTarget" aria-label="Rejoin anchor"></select><button data-branch="join">Rejoin here</button></div>
-          <label>Section color <input type="color" id="sectionColor"></label>
-          <label><input id="allBranches" type="checkbox"> All branches</label>
-          <div id="routeChoices" class="row"></div>
-        </div>
-        <label for="segmentSelect">Segments in selected path</label>
-        <select id="segmentSelect" aria-label="Active segment"></select>
-        <div class="toolbar" style="margin-top:8px">
-          <button id="segmentUp">Move segment up</button>
-          <button id="segmentDown">Move segment down</button>
-        </div>
-        <label for="segmentName">Segment label</label>
-        <input id="segmentName" type="text" maxlength="120" placeholder="Collect samples" />
-        <label for="segmentHeadingMode">Heading mode for all connections in this segment</label>
-        <select id="segmentHeadingMode">
-          <option value="linear">Linear</option>
-          <option value="tangent">Tangent</option>
-          <option value="constant">Constant (destination heading)</option>
-          <option value="mixed" disabled>Mixed — choose a mode to apply to all</option>
-        </select>
-        <div class="toolbar" style="margin-top:8px">
-          <button id="addSegment">New segment</button>
-          <button id="splitSegment">Split at selected point</button>
-          <button id="pointAsSegment" title="Insert a segment at the selected anchor without changing point order. Points after an interior anchor continue in a separate segment.">Make selected point a segment</button>
-          <button id="deleteSegment">Remove segment label</button>
-        </div>
-        <label for="pointHeadingMode">Selected point's incoming heading mode</label>
-        <select id="pointHeadingMode">
-          <option value="linear">Linear</option>
-          <option value="tangent">Tangent</option>
-          <option value="constant">Constant (destination heading)</option>
-        </select>
-        <p class="small">Linear blends the endpoint headings. Tangent faces along the path. Constant holds the destination point's heading for the entire connection.</p>
-        <label for="pointSegmentTarget">Move selected point to segment</label>
-        <select id="pointSegmentTarget" aria-label="Destination segment"></select>
-        <button id="movePointSegment" style="margin-top:8px">Move selected point</button>
-        <p id="pointMoveStatus" class="small" aria-live="polite"></p>
-        <p id="segmentStatus" class="small" aria-live="polite"></p>
-        <p id="legacySegmentHelp" class="small">Press N to add points to the selected segment. Split at an interior anchor to label parts of this path. Reorder segments with the up/down buttons; each starts at the previous segment's endpoint, keeping the auto's starting pose fixed. Select an anchor on the field or in the table to move it to another segment; it appends with its control points. Export creates one Java class for the selected path only. Removing a label keeps its points in the neighboring segment.</p>
-      </div>
-
-      <div class="list" style="margin-top:8px">
+<header class="topbar">
+  <h1>FTC Path Planner</h1>
+  <select id="autoSelect" aria-label="Active auto"><option>Auto 1</option><option>Auto 2</option><option>Auto 3</option><option>Auto 4</option></select>
+  <div class="toolgroup"><button id="undoBtn">Undo</button><button id="redoBtn">Redo</button></div>
+  <button id="previewButton" aria-controls="previewPanel" aria-expanded="false">Preview</button>
+  <button popovertarget="collisionPanel" id="collisionButton">Collisions</button><div id="collisionPanel" popover><label class="exclusion-toggle"><input id="collisionEnabled" type="checkbox" checked />Check collisions</label><p id="collisionStatus" class="small" aria-live="polite"></p></div>
+  <div class="file-tools"><button data-dialog="settings">Settings</button><button id="loadBtn">Import</button><button class="primary" data-dialog="exportDialog">Export</button></div>
+</header>
+<section id="previewPanel" aria-labelledby="previewTitle" hidden>
+  <header><h2 id="previewTitle" tabindex="0" title="Drag or use arrow keys to move Preview">Preview</h2><button id="closePreview" aria-label="Close preview">Close</button></header>
+</section>
+<main class="workspace">
+  <aside id="routesPanel" aria-label="Route navigator">
+    <div class="nav-tabs"><button id="routesTab">Routes</button><button id="pointsTab">Points</button></div>
+    <nav id="routeList" aria-label="Routes and points"></nav>
+    <section id="dock">
+      <div id="divider" role="separator" tabindex="0" aria-label="Route panel height" aria-orientation="horizontal"></div>
+      <div class="dockbar"><button id="graphTab">Route graph</button><button id="tableTab">Point table</button><button id="dockToggle" aria-label="Collapse panel">Collapse</button></div>
+      <div id="dockBody"><div id="graphPanel"><div class="graph-tools"><label><input id="allBranches" type="checkbox"> All branches</label><button id="zoomOut" aria-label="Zoom out">−</button><button id="zoomIn" aria-label="Zoom in">+</button><button id="fitGraph">Fit</button><button id="autoLayout">Auto layout</button></div>
+      <svg id="diagram" tabindex="0" aria-label="Route graph" role="group"><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10" fill="#91a2b8"/></marker></defs><g id="graphScene"></g></svg><p id="emptyGraph">Named sections appear here when you edit a Pedro path.</p></div>
+      <div id="tablePanel" hidden><div class="list" tabindex="0" aria-label="Scrollable point table">
         <table>
           <thead>
             <tr>
@@ -207,76 +43,162 @@
           </thead>
           <tbody id="pointRows"></tbody>
         </table>
+      </div></div></div>
+    </section>
+  </aside>
+  <div class="field-column">
+    <div class="fieldbar"><button id="routesToggle" aria-controls="routesPanel">Routes</button><button id="inspectToggle" aria-controls="inspector">Inspector</button></div>
+    <div id="placementNotice" hidden>
+      <span id="placementMessage" role="status" aria-live="polite"></span>
+      <button id="cancelPlacement">Cancel</button>
+    </div>
+    <div class="canvasWrap" id="dropZone" title="Drop a field image here"><canvas id="canvas" tabindex="0" aria-label="Field editor"></canvas>
+    <button class="empty-field" id="chooseField" data-dialog="settings">Choose a field image</button></div>
+  </div>
+  <div id="inspectorDivider" role="separator" tabindex="0" aria-label="Inspector width" aria-orientation="vertical"></div>
+  <aside id="inspector" aria-labelledby="inspectorTitle">
+    <header class="inspector-header"><h2 id="inspectorTitle">Inspector</h2><span id="inspectorMode"></span></header>
+    <p id="editorHint">Select an anchor to edit it, or press N over the field to add one.</p>
+    <section id="poseControls" class="inspector-group" hidden>
+      <div class="inspector-heading"><h3 id="selectionTitle">Anchor</h3><label><input type="checkbox" id="inspectorLock"> Lock</label></div>
+      <div class="pose-grid">
+        <div><label for="selXIn">X</label><input id="selXIn" type="number" step="0.5"></div>
+        <div><label for="selYIn">Y</label><input id="selYIn" type="number" step="0.5"></div>
+        <div><label for="headingDeg">Heading (°)</label><input id="headingDeg" type="number" step="1"></div>
       </div>
+      <button id="deleteBtn">Delete anchor</button>
+      <section id="connectionControls" hidden>
+        <h4>Incoming connection</h4>
+        <label for="pointHeadingMode">Heading mode</label>
+        <select data-selection="anchor" id="pointHeadingMode">
+          <option value="linear">Linear</option>
+          <option value="tangent">Tangent</option>
+          <option value="constant">Constant (destination heading)</option></select>
+        <button id="addHandle" aria-keyshortcuts="C" title="Add control point (C)">Add control (C)</button>
+        <details><summary>Heading help</summary><p class="small">Linear blends endpoint headings. Tangent follows the curve. Constant holds the destination heading.</p></details>
+      </section>
+    </section>
+    <section id="segmentControls" class="inspector-group" hidden>
+      <div class="inspector-heading"><h3>Section</h3><small id="anchorCount"></small></div>
+      <label for="segmentSelect">Segments in selected path</label>
+      <select id="segmentSelect" aria-label="Active segment"></select>
+        <div class="toolbar" role="group" aria-label="Segment operations" style="margin-top:8px">
+          <button id="segmentUp">Move segment up</button>
+          <button id="segmentDown">Move segment down</button>
+          <button id="addSegment">New segment</button>
+          <button data-selection="anchor" id="splitSegment" title="Start a segment at this anchor. Any following points in this segment move into the new one.">Start segment at selected point</button>
+          <button data-selection="anchor" id="pointAsSegment" title="Insert a segment at the selected anchor without changing point order. Points after an interior anchor continue in a separate segment.">Make selected point a segment</button>
+          <button id="deleteSegment">Remove segment label</button>
+        </div>
+      <div id="sectionFields">
+        <div id="placementControls" hidden><label for="insertAfter">Insert next point after</label><select id="insertAfter"></select></div>
+        <div class="section-identity">
+          <div><label for="segmentName">Name</label><input id="segmentName" type="text" maxlength="120"></div>
+          <label for="sectionColor">Color<input type="color" id="sectionColor"></label>
+        </div>
+        <label for="segmentHeadingMode">Heading mode for all connections</label>
+        <select id="segmentHeadingMode">
+          <option value="linear">Linear</option>
+          <option value="tangent">Tangent</option>
+          <option value="constant">Constant (destination heading)</option>
+          <option value="mixed" disabled>Mixed — choose a mode to apply to all</option></select>
+      </div>
+      <div id="pointTransfer" hidden><label data-selection="anchor" for="pointSegmentTarget">Move selected point to segment</label>
+        <select data-selection="anchor" id="pointSegmentTarget" aria-label="Destination segment"></select>
+        <button data-selection="anchor" id="movePointSegment" style="margin-top:8px">Move selected point</button></div>
+      <p id="pointMoveStatus" class="small" aria-live="polite"></p>
+      <section aria-labelledby="branchTitle">
+        <h4 id="branchTitle">Branch operations</h4>
+        <div id="branchActions">
+          <div data-selection="anchor" class="row"><button data-branch="fork">Branch from anchor</button><button data-branch="insert">Insert midpoint</button></div>
+          <div class="row"><button data-branch="duplicate">Duplicate branch</button><button data-branch="delete">Delete branch</button></div>
+          <button data-branch="finish">Finish independently</button>
+          <label for="joinTarget">Rejoin at anchor</label>
+          <div class="row"><select id="joinTarget" aria-describedby="joinHint"></select><button data-branch="join" aria-describedby="joinHint">Rejoin here</button></div>
+          <small id="joinHint" class="small"></small>
 
-      <!-- EXPORT -->
-      <h2>3) Export</h2>
+          <div id="routeChoices" class="row"></div>
+        </div>
+      </section>
+      <p id="segmentStatus" class="small" aria-live="polite"></p>
+      <details id="legacySegmentHelp"><summary>Segment editing help</summary><p class="small">Press N to add points to the selected segment. Split at an interior anchor to label parts of this path. Reorder segments with the up/down buttons; each starts at the previous segment's endpoint, keeping the auto's starting pose fixed. Select an anchor on the field or in the table to move it to another segment; it appends with its control points. Export creates one Java class for the selected path only. Removing a label keeps its points in the neighboring segment.</p></details>
+    </section>
+    <section class="inspector-group" aria-label="Path tools">
+      <div id="transforms"></div>
+      <div class="toolbar clear-paths"><button id="clearBtn" class="danger">Clear selected path</button><button id="clearAllBtn" class="danger">Clear all paths</button></div>
+    </section>
+  </aside>
+</main>
+<dialog id="settings" aria-labelledby="settingsTitle"><header><h2 id="settingsTitle">Settings</h2><form method="dialog"><button>Close</button></form></header>
+<h2>Field configuration</h2>
       <div class="grid-2">
         <div>
-          <label>Java class</label>
-          <select id="javaType">
-            <option value="rr">com.acmerobotics.roadrunner.Pose2d</option>
-            <option value="ftclib">com.arcrobotics.ftclib.geometry.Pose2d</option>
-            <option value="RilLib">org.firstinspires.ftc.teamcode.RilLib.Math.Geometry.Pose2d;</option>
-            <option value="pedro">Pedro Pathing (PoseFactory)</option>
-          </select>
+          <label for="imgInput">Load image (PNG/JPG/SVG/WebP/BMP)</label>
+          <input id="imgInput" type="file" accept="image/*" />
         </div>
         <div>
-          <label>Format</label>
-          <select id="exportKind">
-            <option value="list">Pose list</option>
-            <option value="array">Pose array</option>
-            <option value="posefactory">Pedro named segments (PoseFactory)</option>
-            <option value="pathchain">Pedro PathChain</option>
+          <label for="sampleSelect">Sample image</label>
+          <select id="sampleSelect">
+            <option value="">— none —</option>
+            <option value="pedro-biobuzz">Pedro Pathing Biobuzz</option>
+            <option value="rr-into-the-deep">RoadRunner Into the Deep</option>
+            <option value="rr-decode">RoadRunner DECODE</option>
+            <option value="pedro-decode">Pedro Pathing DECODE</option>
           </select>
         </div>
       </div>
 
-      <div class="grid-2" style="margin-top:8px">
+      <div class="grid-2">
         <div>
-          <label>File type</label>
-          <select id="exportFileType">
-            <option value="java-class">Java class (.java)</option>
-            <option value="java-snippet">Java snippet only (.java.txt)</option>
-            <option value="json">JSON (.json)</option>
-            <option value="csv">CSV (.csv)</option>
+          <label for="fieldSize">Field size (chosen unit)</label>
+          <input id="fieldSize" type="number" value="3.66" />
+        </div>
+        <div>
+          <label for="originSelect">Origin (0, 0)</label>
+          <select id="originSelect">
+            <option value="center">Center</option>
+            <option value="bottomLeft">Bottom-left corner</option>
+            <option value="topLeft">Top-left corner</option>
           </select>
         </div>
         <div>
-          <label>Class name (for Java class)</label>
-          <input id="className" type="text" value="AutoPath" />
+          <label for="measurementsUnit">Unit used</label>
+          <select id="measurementsUnit">
+            <option value="m">Meters</option>
+            <option value="cm">Centimeters</option>
+            <option value="ft">Feet</option>
+            <option value="in">Inches</option>
+          </select>
+        </div>
+        <div>
+          <label for="coordinateSystem">Coordinate system</label>
+          <select id="coordinateSystem">
+            <option value="ftc">FTC: X forward, Y left</option>
+            <option value="pedro">Pedro: X right, Y up</option>
+            <option value="image">Image: X right, Y down</option>
+          </select>
+        </div>
+      </div><h2>Robot footprint</h2>
+      <div class="grid-2">
+        <div>
+          <label for="robotLen">Length (Selected measurement)</label>
+          <input id="robotLen" type="number" step="0.5" value="0.4572" />
+        </div>
+        <div>
+          <label for="robotWid">Width (Selected measurement)</label>
+          <input id="robotWid" type="number" step="0.5" value="0.4572" />
         </div>
       </div>
+      <div class="row" style="margin-top:6px">
 
-      <div>
-        <label>Java folder path (sets Java package)</label>
-        <input id="exportFolderPath" type="text"
-          placeholder="org\firstinspires\ftc\teamcode\opmodes\autos\paths" />
-      </div>
-
-      <div class="toolbar" style="margin-top:8px">
-        <button id="exportBtn" class="accent">Preview</button>
-        <button id="saveFileBtn">Save to file…</button>
-        <button id="chooseDirBtn">Choose folder…</button>
-        <button id="copyBtn">Copy to clipboard</button>
-      </div>
-
-      <label style="margin-top:10px">Output</label>
-      <code id="output"></code>
-    </div>
-
-    <!-- RIGHT: Canvas (stays fixed; no scroll) -->
-    <div class="right">
-      <div class="row">
-        <span class="pill">N: add point at cursor</span>
-        <span class="pill">Click point: select</span>
-        <span class="pill">Drag selected point: move (Shift=0.5″)</span>
-        <span class="pill">Drag handle / Q,E: rotate (Shift=15°)</span>
-      </div>
-      <div class="canvasWrap" id="dropZone" title="Drop an image here">
-        <canvas id="canvas"></canvas>
-      </div>
-      <details class="exclusion-controls" id="exclusionPanel" open>
+        <label>
+          <input id="boxRotate" type="checkbox" class="hidden-checkbox" checked />
+          <label for="boxRotate" class="custom-checkbox-label">
+            <span class="custom-checkbox-box"></span>
+            Align with heading
+          </label>
+        </label>
+      </div><details class="exclusion-controls" id="exclusionPanel" open>
         <summary>
           <span class="exclusion-panel-heading">Exclusion zone — drag across empty field space to draw a box <span id="exclusionSummaryStatus" class="small"></span></span>
           <span class="exclusion-panel-symbol" aria-hidden="true"></span>
@@ -293,22 +215,87 @@
           </label>
         </div>
         <div class="toolbar zone-settings">
-          <label class="exclusion-toggle"><input id="collisionEnabled" type="checkbox" checked />Check collisions</label>
-          <label class="exclusion-toggle"><input id="exportExclusionZones" type="checkbox" />Include zones in export</label>
+
           <label>Clearance (in)<input id="zoneMargin" type="number" min="0" max="144" step="0.1" value="0" /></label>
         </div>
-        <p id="collisionStatus" class="small" aria-live="polite"></p>
+
         <details class="zone-list-panel" open>
           <summary>Shared field zones — coordinates in Pedro inches</summary>
           <div id="exclusionZoneList"></div>
         </details>
         <a href="java/org/firstinspires/ftc/teamcode/util/ExclusionZone.java" download>Download custom ExclusionZone.java</a>
-      </details>
+      </details></dialog>
+<dialog id="exportDialog" aria-labelledby="exportTitle"><header><h2 id="exportTitle">Export</h2><form method="dialog"><button>Close</button></form></header>
+  <div class="export-layout">
+    <div class="export-options">
+      <div class="grid-2">
+        <div>
+          <label for="javaType">Java class</label>
+          <select id="javaType">
+            <option value="rr">com.acmerobotics.roadrunner.Pose2d</option>
+            <option value="ftclib">com.arcrobotics.ftclib.geometry.Pose2d</option>
+            <option value="RilLib">org.firstinspires.ftc.teamcode.RilLib.Math.Geometry.Pose2d;</option>
+            <option value="pedro">Pedro Pathing (PoseFactory)</option>
+          </select>
+        </div>
+        <div>
+          <label for="exportKind">Format</label>
+          <select id="exportKind">
+            <option value="list">Pose list</option>
+            <option value="array">Pose array</option>
+            <option value="posefactory">Pedro named segments (PoseFactory)</option>
+            <option value="pathchain">Pedro PathChain</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-top:8px">
+        <div>
+          <label for="exportFileType">File type</label>
+          <select id="exportFileType">
+            <option value="java-class">Java class (.java)</option>
+            <option value="java-snippet">Java snippet only (.java.txt)</option>
+            <option value="json">JSON (.json)</option>
+            <option value="csv">CSV (.csv)</option>
+          </select>
+        </div>
+        <div>
+          <label for="className">Class name (for Java class)</label>
+          <input id="className" type="text" value="AutoPath" />
+        </div>
+      </div>
+
+      <div>
+        <label for="exportFolderPath">Java folder path (sets Java package)</label>
+        <input id="exportFolderPath" type="text"
+          placeholder="org\firstinspires\ftc\teamcode\opmodes\autos\paths" />
+      </div>
+
+      <label class="exclusion-toggle"><input id="exportExclusionZones" type="checkbox" />Include zones in export</label>
+      <div class="row" style="margin-top:8px">
+        <label class="row">
+          <div class="custom-checkbox-wrapper">
+            <input type="checkbox" id="headingWrap" class="hidden-checkbox">
+            <label for="headingWrap" class="custom-checkbox-label">
+              <span class="custom-checkbox-box"></span>
+              Wrap headings to <b>±180°</b> for display and <b>±π</b> on export
+            </label>
+          </div>
+        </label>
+      </div>
+      <div class="small">Off = show 0-360° and export radians in [0, 2π). On = show -180…+180° and export radians in
+        (−π, +π].</div>
+      <div class="toolbar" style="margin-top:8px">
+        <button id="saveFileBtn">Save to file…</button>
+        <button id="chooseDirBtn">Choose folder…</button>
+        <button id="copyBtn">Copy to clipboard</button>
+      </div>
+
     </div>
+    <section class="export-preview" aria-labelledby="outputTitle">
+      <h3 id="outputTitle">Output</h3>
+      <code id="output" tabindex="0" aria-labelledby="outputTitle"></code>
+    </section>
   </div>
-
-  <!-- Load the modular app -->
-  <script type="module" src="js/app.js"></script>
-</body>
-
-</html>
+</dialog>
+<script type="module" src="js/app.js"></script></body></html>
